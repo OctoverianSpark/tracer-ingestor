@@ -1,0 +1,133 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DB_URL")
+}
+
+model computers {
+  id                 BigInt               @id @default(autoincrement())
+  serial_number      String?              @unique @db.VarChar(255)
+  hostname           String               @db.VarChar(255)
+  ip_address         String?              @db.VarChar(50)
+  last_seen          DateTime?            @default(now()) @db.DateTime(0)
+  created_at         DateTime?            @default(now()) @db.DateTime(0)
+  state_events       state_events[]
+  time_summary_daily time_summary_daily[]
+  window_logs        window_logs[]
+}
+
+model clients {
+  id            BigInt   @id @default(autoincrement())
+  machineName   String
+  machineSerial String
+  userName      String
+  displayName   String
+  ip            String
+  connectedAt   DateTime @default(now())
+}
+
+model document_types {
+  id         Int        @id @default(autoincrement())
+  full_name  String     @db.VarChar(120)
+  short_name String     @db.VarChar(60)
+  value      String?    @db.VarChar(120)
+  active     Int?       @db.TinyInt
+  personal   personal[]
+}
+
+model personal {
+  id            Int            @id @default(autoincrement())
+  first_name    String         @db.Text
+  middle_name   String?        @db.Text
+  last_name     String         @db.Text
+  doc_type      Int
+  document_type document_types @relation(fields: [doc_type], references: [id])
+  time_mesh     time_mesh[]
+  document      String?        @db.VarChar(150)
+  job_title     String?        @db.VarChar(120)
+}
+
+model time_mesh {
+  id       Int       @id @default(autoincrement())
+  start    DateTime  @db.Time(0)
+  end      DateTime  @db.Time(0)
+  user_id  Int
+  personal personal  @relation(fields: [user_id], references: [id])
+  break    DateTime  @db.Time(0)
+  lunch    DateTime  @db.Time(0)
+  overtime DateTime? @db.Time(0)
+}
+
+model state_events {
+  id          BigInt              @id @default(autoincrement())
+  computer_id BigInt
+  user_name   String?             @db.VarChar(100)
+  timestamp   DateTime            @db.DateTime(0)
+  state       state_events_state?
+  reason      String?             @db.VarChar(255)
+  computers   computers           @relation(fields: [computer_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "state_events_ibfk_1")
+
+  @@index([computer_id], map: "computer_id")
+  @@index([timestamp], map: "idx_state_time")
+  @@index([user_name], map: "idx_state_user")
+}
+
+model time_summary_daily {
+  id                BigInt    @id @default(autoincrement())
+  computer_id       BigInt
+  user_name         String    @db.VarChar(100)
+  date              DateTime  @db.Date
+  active_time       Int?      @default(0)
+  idle_time         Int?      @default(0)
+  productive_time   Int?      @default(0)
+  unproductive_time Int?      @default(0)
+  overtime_time     Int?      @default(0)
+  updated_at        DateTime? @default(now()) @db.DateTime(0)
+  computers         computers @relation(fields: [computer_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "time_summary_daily_ibfk_1")
+
+  @@unique([computer_id, user_name, date], map: "uq_daily")
+  @@index([date], map: "idx_summary_date")
+  @@index([user_name], map: "idx_summary_user")
+}
+
+model users {
+  id            BigInt      @id @default(autoincrement())
+  username      String      @unique(map: "username") @db.VarChar(100)
+  email         String?     @unique(map: "email") @db.VarChar(255)
+  password_hash String      @db.Text
+  role          users_role? @default(user)
+  created_at    DateTime?   @default(now()) @db.DateTime(0)
+}
+
+model window_logs {
+  id           BigInt    @id @default(autoincrement())
+  computer_id  BigInt
+  user_name    String?   @db.VarChar(100)
+  timestamp    DateTime  @db.DateTime(0)
+  app_name     String?   @db.VarChar(255)
+  window_title String?   @db.Text
+  url          String?   @db.Text
+  duration     Int?
+  idle         Boolean?
+  computers    computers @relation(fields: [computer_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "window_logs_ibfk_1")
+
+  @@index([computer_id], map: "computer_id")
+  @@index([timestamp], map: "idx_time")
+}
+
+enum state_events_state {
+  active
+  idle
+  productive
+  unproductive
+  locked
+}
+
+enum users_role {
+  admin
+  manager
+  user
+}
