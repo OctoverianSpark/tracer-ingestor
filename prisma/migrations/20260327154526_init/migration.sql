@@ -1,0 +1,156 @@
+-- CreateTable
+CREATE TABLE `computers` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `serial_number` VARCHAR(255) NULL,
+    `hostname` VARCHAR(255) NOT NULL,
+    `ip_address` VARCHAR(50) NULL,
+    `last_seen` DATETIME(0) NULL DEFAULT CURRENT_TIMESTAMP(0),
+    `created_at` DATETIME(0) NULL DEFAULT CURRENT_TIMESTAMP(0),
+    `updated_at` DATETIME(0) NULL,
+    `personal_id` BIGINT NULL,
+
+    UNIQUE INDEX `computers_serial_number_key`(`serial_number`),
+    UNIQUE INDEX `computers_hostname_key`(`hostname`),
+    INDEX `computers_hostname_idx`(`hostname`),
+    INDEX `computers_personal_id_idx`(`personal_id`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `clients` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `machineName` VARCHAR(191) NOT NULL,
+    `machineSerial` VARCHAR(191) NOT NULL,
+    `userName` VARCHAR(191) NOT NULL,
+    `displayName` VARCHAR(191) NOT NULL,
+    `ip` VARCHAR(191) NOT NULL,
+    `connectedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `computer_id` BIGINT NULL,
+
+    UNIQUE INDEX `clients_machineSerial_key`(`machineSerial`),
+    INDEX `clients_computer_id_idx`(`computer_id`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `users` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `username` VARCHAR(100) NOT NULL,
+    `email` VARCHAR(255) NULL,
+    `password_hash` TEXT NOT NULL,
+    `role` ENUM('admin', 'manager', 'user') NOT NULL DEFAULT 'user',
+    `created_at` DATETIME(0) NULL DEFAULT CURRENT_TIMESTAMP(0),
+    `updated_at` DATETIME(0) NULL,
+
+    UNIQUE INDEX `users_username_key`(`username`),
+    UNIQUE INDEX `users_email_key`(`email`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `personal` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `first_name` TEXT NOT NULL,
+    `middle_name` TEXT NULL,
+    `last_name` TEXT NOT NULL,
+    `doc_type` INTEGER NOT NULL,
+    `document` VARCHAR(150) NULL,
+    `job_title` VARCHAR(120) NULL,
+    `corporative_email` VARCHAR(191) NOT NULL DEFAULT '',
+    `mode_type` INTEGER NOT NULL,
+    `created_at` DATETIME(0) NULL DEFAULT CURRENT_TIMESTAMP(0),
+    `updated_at` DATETIME(0) NULL,
+
+    UNIQUE INDEX `personal_document_key`(`document`),
+    INDEX `personal_doc_type_mode_type_idx`(`doc_type`, `mode_type`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `modes` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `name` TEXT NOT NULL,
+
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `document_types` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `full_name` VARCHAR(120) NOT NULL,
+    `short_name` VARCHAR(60) NOT NULL,
+    `value` VARCHAR(120) NULL,
+    `active` TINYINT NULL,
+
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `time_mesh` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `user_id` BIGINT NOT NULL,
+    `day_of_week` TINYINT NOT NULL,
+    `start` TIME(0) NOT NULL,
+    `end` TIME(0) NOT NULL,
+    `break` TIME(0) NOT NULL,
+    `lunch` TIME(0) NOT NULL,
+    `overtime` TIME(0) NULL,
+
+    INDEX `time_mesh_user_id_idx`(`user_id`),
+    UNIQUE INDEX `time_mesh_user_id_day_of_week_key`(`user_id`, `day_of_week`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `state_logs` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `computer_id` BIGINT NOT NULL,
+    `user_name` VARCHAR(100) NULL,
+    `state` ENUM('working', 'break', 'wc', 'lunch', 'idle', 'offline') NOT NULL,
+    `category` ENUM('active', 'neutral', 'inactive') NOT NULL,
+    `type` ENUM('auto', 'manual') NOT NULL,
+    `timestamp` DATETIME(0) NOT NULL,
+    `reason` VARCHAR(255) NULL,
+
+    INDEX `state_logs_computer_id_idx`(`computer_id`),
+    INDEX `state_logs_timestamp_idx`(`timestamp`),
+    INDEX `state_logs_computer_id_timestamp_idx`(`computer_id`, `timestamp`),
+    INDEX `state_logs_state_idx`(`state`),
+    INDEX `state_logs_category_idx`(`category`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `app_usage_logs` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `computer_id` BIGINT NOT NULL,
+    `interval_start` DATETIME(0) NOT NULL,
+    `interval_end` DATETIME(0) NOT NULL,
+    `apps` JSON NOT NULL,
+
+    INDEX `app_usage_logs_computer_id_idx`(`computer_id`),
+    INDEX `app_usage_logs_interval_start_idx`(`interval_start`),
+    INDEX `app_usage_logs_computer_id_interval_start_idx`(`computer_id`, `interval_start`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- AddForeignKey
+ALTER TABLE `computers` ADD CONSTRAINT `computers_personal_id_fkey` FOREIGN KEY (`personal_id`) REFERENCES `personal`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `clients` ADD CONSTRAINT `clients_computer_id_fkey` FOREIGN KEY (`computer_id`) REFERENCES `computers`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `personal` ADD CONSTRAINT `personal_doc_type_fkey` FOREIGN KEY (`doc_type`) REFERENCES `document_types`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `personal` ADD CONSTRAINT `personal_mode_type_fkey` FOREIGN KEY (`mode_type`) REFERENCES `modes`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `time_mesh` ADD CONSTRAINT `time_mesh_user_id_fkey` FOREIGN KEY (`user_id`) REFERENCES `personal`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `state_logs` ADD CONSTRAINT `state_logs_computer_id_fkey` FOREIGN KEY (`computer_id`) REFERENCES `computers`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `app_usage_logs` ADD CONSTRAINT `app_usage_logs_computer_id_fkey` FOREIGN KEY (`computer_id`) REFERENCES `computers`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;

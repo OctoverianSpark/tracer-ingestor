@@ -1,2 +1,0 @@
--- AlterTable
-ALTER TABLE `clients` MODIFY `connectedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3);

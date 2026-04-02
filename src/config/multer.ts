@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 import type { Request, Response } from "express";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SCREENSHOTS_DIR = path.join(__dirname, "screenshots");
+const SCREENSHOTS_DIR = path.join(__dirname, "../../screenshots");
 
 if (!fs.existsSync(SCREENSHOTS_DIR)) {
   fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
@@ -15,28 +15,32 @@ if (!fs.existsSync(SCREENSHOTS_DIR)) {
 // Cambia a memoryStorage para interceptar el buffer
 export const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: 128 * 1024 * 1024 },
 });
 
 export async function saveScreenShot(req: Request, res: Response) {
   try {
     const file = req.file;
     const machine = req.body?.machine as string;
-    const user = req.body?.user as string;
+    console.log(machine);
 
     if (!file) {
       res.status(400).json({ error: "No file provided" });
       return;
     }
 
-    if (!machine || !user) {
+    if (!machine) {
       res.status(400).json({ error: "Missing machine or user fields" });
       return;
     }
 
+
+    if (!fs.existsSync(path.join(SCREENSHOTS_DIR, machine))) {
+      fs.mkdirSync(path.join(SCREENSHOTS_DIR, machine), { recursive: true })
+    }
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const filename = `${timestamp}-${machine}-${user}.jpg`;
-    const savePath = path.join(SCREENSHOTS_DIR, filename);
+    const filename = `${timestamp}_${file.originalname.split('_').find(name => name.includes('Monitor'))}`;
+    const savePath = path.join(SCREENSHOTS_DIR, machine, filename);
 
     // Comprime antes de guardar
     await sharp(file.buffer)

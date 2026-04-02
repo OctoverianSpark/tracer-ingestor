@@ -3,41 +3,25 @@ import { wsHub } from "../wsHub.js";
 import { existsSync, readdirSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { ActionMessageTypes, MessageTypes, type ActionMessage, type FileMessage, type NotificationMessage, type WsMessage } from "../types/tracer.js";
+import { createAction } from "../helpers/utils.js";
 
-enum Types {
-        PING,
-        COMMAND,
-        NOTIFICATION,
-        FILE
-}
+export async function lockMachine(req: Request, res: Response) {
 
-interface FilePayload {
-  type: Types.FILE
-  fileName: string
-  fileSize: number
-  mimeType: string
-  data: string // Base64
-}
-export async function lockMachine(req:Request, res:Response){
+  const { serial } = req.params
 
-  const {serial} = req.params
-
-  console.log(serial);
-  
-
+  const msg = createAction(ActionMessageTypes.Lock)
+  console.log(msg);
 
   try {
-    
-    wsHub.sendTo(serial as string,{
-      type: Types.COMMAND,
-      command: "LOCK"
-    })
 
-    res.json({ok:true})
+    wsHub.sendTo(serial as string, msg as ActionMessage)
+
+    res.json({ ok: true })
   } catch (err) {
     console.log(err);
-    
-    res.status(409).json({error: "Maquina apagada o fuera de linea"})
+
+    res.status(409).json({ error: "Maquina apagada o fuera de linea" })
   }
 
 
@@ -45,41 +29,49 @@ export async function lockMachine(req:Request, res:Response){
 }
 
 
-export async function notifyMachine(req:Request, res:Response){
 
-  const {serial } = req.params
-  const {title,message} = req.body
+export async function notifyMachine(req: Request, res: Response) {
+
+  const { serial } = req.params
+  const { title, message } = req.body as { title: string; message: string }
   try {
-    console.log(title,message);
-    
-    wsHub.sendTo(serial as string,{
-      type:Types.NOTIFICATION,
-      title:title,
-      msg: message
-    })
-    res.json({ok: true})
-    
+    console.log(title, message);
+
+    const msg: WsMessage = {
+      type: MessageTypes.Notification,
+      title: title as string,
+      text: message as string
+    } as NotificationMessage
+
+    console.log(msg);
+
+
+    wsHub.sendTo(serial as string, msg)
+    res.json({ ok: true })
+
   } catch (error) {
-    res.status(409).json({error:"Maquina apagada o fuera de linea"})
+    res.status(409).json({ error: "Maquina apagada o fuera de linea" })
   }
 
 }
-export async function listMachines(req:Request, res:Response){
+export async function listMachines(req: Request, res: Response) {
 
   try {
-    const machines = wsHub.listOnline();
+    const machines = wsHub.listAll();
+    console.log(machines);
 
-    res.json({ok: true,machines})
-    
+
+    res.json({ ok: true, machines })
+
   } catch (error) {
-    res.status(409).json({error:"Maquina apagada o fuera de linea"})
+    res.status(409).json({ error: "Maquina apagada o fuera de linea" })
   }
 
 }
 
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SCREENSHOTS_DIR = path.join(__dirname,'..','..', "screenshots");
+const SCREENSHOTS_DIR = path.join(__dirname, '..', '..', "screenshots");
 
 export async function getReport(req: Request, res: Response) {
   const { computername, date } = req.query as { computername: string; date: string };
@@ -89,16 +81,17 @@ export async function getReport(req: Request, res: Response) {
     return;
   }
 
-  const filteredDate = date.replace(/-/g, ""); // "2026-02-20" -> "20260220"
 
   try {
-    const allFiles = readdirSync(SCREENSHOTS_DIR);
+    console.log(computername);
+
+    const allFiles = readdirSync(path.join(SCREENSHOTS_DIR, computername));
 
     const matched = allFiles.filter(file =>
-      file.includes(computername) && file.includes(filteredDate)
+      file.includes(date)
     );
 
-    
+
 
     res.json({ ok: true, files: matched });
   } catch (ex) {
@@ -109,16 +102,21 @@ export async function getReport(req: Request, res: Response) {
 export async function getScreenshot(req: Request, res: Response) {
   try {
     const { filename } = req.params as { filename: string };
-    console.log(filename);
-    
+    const { machine } = req.params as { machine: string }
+    console.log(filename, machine);
 
-    const files = readdirSync(SCREENSHOTS_DIR);
+
+    const files = readdirSync(path.join(SCREENSHOTS_DIR, machine));
+    console.log(files);
+
     if (!files.includes(filename)) {
       res.status(404).json({ error: "Screenshot not found" });
       return;
     }
 
-    const filePath = path.join(SCREENSHOTS_DIR, filename);
+    const filePath = path.join(SCREENSHOTS_DIR, machine, filename);
+    console.log(filePath);
+
     res.sendFile(filePath);
   } catch (err) {
     console.error("[GET SCREENSHOT ERROR]", (err as Error).message);
@@ -131,7 +129,7 @@ export async function sendFileToMachine(req: Request, res: Response) {
     const { serial } = req.params
     const file = req.file
     console.log(serial);
-    
+
     if (!file) {
       return res.status(400).json({ error: 'No file provided' })
     }
@@ -141,26 +139,26 @@ export async function sendFileToMachine(req: Request, res: Response) {
     }
 
     // Preparar el payload
-    const payload:FilePayload = {
-      type: Types.FILE,
+    const payload: FileMessage = {
+      type: MessageTypes.File,
       fileName: file.originalname,
       fileSize: file.size,
       mimeType: file.mimetype,
       data: file.buffer.toString('base64')
-    }
+    } as FileMessage
 
     // Enviar a través del WebSocket
-    wsHub.sendFile(serial as string, payload)
+    wsHub.sendTo(serial as string, payload)
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: `File ${file.originalname} sent to ${serial}`,
       fileSize: file.size
     })
 
   } catch (error) {
     console.error('Error sending file:', error)
-    
+
 
     res.status(500).json({ error: 'Failed to send file' })
   }

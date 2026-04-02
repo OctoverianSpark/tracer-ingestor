@@ -1,14 +1,18 @@
 import { Router } from "express";
-import { deleteEmployee, getDocTypes, getEmployee, getEmployees, saveEmployee } from "../controllers/personal.controller.js";
+import { deleteDocType, deleteEmployee, deleteMode, getDocTypes, getEmployee, getEmployees, getModes, saveDocType, saveEmployee, saveMode } from "../controllers/personal.controller.js";
 
 const personalRoutes = Router()
 
-personalRoutes.get('/get',getEmployees)
-personalRoutes.get('/find/:id',getEmployee)
-personalRoutes.get('/document_types',getDocTypes)
-personalRoutes.delete('/delete',deleteEmployee)
-
-personalRoutes.post('/save',saveEmployee)
+personalRoutes.get('/get', getEmployees)
+personalRoutes.get('/find/:id', getEmployee)
+personalRoutes.delete('/delete', deleteEmployee)
+personalRoutes.get('/document_types', getDocTypes)
+personalRoutes.post('/document_types/save', saveDocType)
+personalRoutes.post('/document_types/delete/:id', deleteDocType)
+personalRoutes.get('/modes', getModes)
+personalRoutes.post('/modes/save', saveMode)
+personalRoutes.delete('/modes/delete/:id', deleteMode)
+personalRoutes.post('/save', saveEmployee)
 
 
 export default personalRoutes

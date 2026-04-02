@@ -9,5 +9,13 @@ const prisma = globalForPrisma.prisma ?? new PrismaClient();
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
 }
+declare global {
+  interface BigInt {
+    toJSON(): number; // o string si usas .toString()
+  }
+}
 
+BigInt.prototype.toJSON = function () {
+  return Number(this);
+};
 export default prisma;

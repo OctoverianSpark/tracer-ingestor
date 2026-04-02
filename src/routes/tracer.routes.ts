@@ -1,12 +1,13 @@
 import { Router } from "express"
-import { getBatchData, ingestBatch, saveScreenShot } from "../controllers/tracer.controller.js"
-import { upload } from "../config/multer.js"
+import { getBatchData, getStateLogs, syncStates, syncAppUsage } from "../controllers/tracer.controller.js"
+import { saveScreenShot, upload } from "../config/multer.js"
 
 const tracerRoutes = Router()
-tracerRoutes.post("/batch", ingestBatch)
+tracerRoutes.post("/states", syncStates)
+tracerRoutes.post("/app-usage", syncAppUsage)
 tracerRoutes.post("/activity-batch", getBatchData)
-tracerRoutes.post("/screenshot", upload.single("file"),saveScreenShot)
-tracerRoutes.post("/time-batch", getBatchData)
+tracerRoutes.post("/screenshot", upload.single("file"), saveScreenShot)
+tracerRoutes.get("/get-state-logs", getStateLogs)
 
 
 

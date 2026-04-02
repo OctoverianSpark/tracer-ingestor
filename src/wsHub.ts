@@ -1,116 +1,113 @@
 // wsHub.ts
 import WebSocket from "ws";
-import type { ClientConnection } from "./types/tracer.js";
+import type { ClientConnection, WsMessage } from "./types/tracer.js";
 import { saveClient } from "./services/tracer.service.js";
 import prisma from "./lib/prisma.js";
-
-interface FilePayload {
-  type: 3
-  fileName: string
-  fileSize: number
-  mimeType: string
-
-  data: string // Base64
-}
 
 class WsHub {
   private clients = new Map<string, ClientConnection>();
 
-  private getClients = async (serialNumber: string) => {
+  async initialize() {
+    const existingClients = await prisma.computers.findMany()
+    for (const client of existingClients) {
+      this.clients.set(client.hostname, {
+        ws: null as unknown as WebSocket, // Placeholder, will be replaced on actual connection
+        machineName: client.hostname,
+        machineSerial: client.serial_number!,
+        ip: client.ip_address!,
+        isAlive: true,
+        connectedAt: new Date(),
+        personal_id: client.personal_id!
+      })
+      console.log(`🟢 ${client.hostname} loaded from database`)
+    }
+  }
 
-    const data = await prisma.clients.findFirst({
-      where: {
-        machineSerial:serialNumber
-      }
+  private async findClient(machineSerial: string) {
+    return await prisma.computers.findUnique({
+      where: { hostname: machineSerial }
     })
-    return data
+  }
 
-  } 
 
   async addClient(client: ClientConnection) {
-    const findClient = await this.getClients(client.machineSerial)
-    if(findClient){
-      
+    const existing = await this.findClient(client.machineSerial)
 
-      
-      console.log(`🟢 ${client.machineName} re-connected`);
-
-    }else{
-      saveClient(client)
-      console.log(`🟢 ${client.machineName} connected`);
-
+    if (existing) {
+      console.log(`🟢 ${client.machineName} re-connected`)
+    } else {
+      await saveClient(client)
+      console.log(`🟢 ${client.machineName} connected`)
     }
-    this.clients.set(client.machineSerial, client);
 
+    this.clients.set(client.machineSerial, client)
   }
 
-  removeClient(machineId: string) {
-    const client = this.clients.get(machineId);
-    if (!client) return;
+  removeClient(machineSerial: string) {
+    const client = this.clients.get(machineSerial)
+    if (!client) return
 
-    client.ws.close();
-    this.clients.delete(machineId);
-    console.log(`🔴 ${machineId} disconnected`);
+    client.ws.close()
+    this.clients.delete(machineSerial)
+    console.log(`🔴 ${client.machineName} disconnected`)
   }
 
-  sendTo(machineId: string, payload: unknown) {
-    const client = this.clients.get(machineId);
-    console.log(client);
-    
+  shutdownClient(machineSerial: string) {
+    const client = this.clients.get(machineSerial)
+    if (!client) return
+
+    client.isAlive = false
+
+    console.log(`🔴 ${client.machineName} disconnected`)
+  }
+
+  sendTo(machineSerial: string, payload: WsMessage) {
+    const client = this.clients.get(machineSerial)
+
     if (!client || client.ws.readyState !== WebSocket.OPEN) {
-      throw new Error("Client offline");
+      throw new Error(`Client ${machineSerial} offline`)
     }
 
-    client.ws.send(JSON.stringify(payload));
+    client.ws.send(JSON.stringify(payload))
   }
 
-  shutdownClient(machineId: string) {
-    const client = this.clients.get(machineId)
-    if(client){
-      client.isAlive = false
-    }
-    console.log('Client disconnected, waiting for conn');
-    
-  }
-
-  
-  sendFile(machineId: string, payload: FilePayload) {
-  const client = this.clients.get(machineId)
-
-  if(!client || client.ws.readyState !== WebSocket.OPEN) {
-    throw new Error("Client offline")
-  }
-
-  // Enviar como JSON string
-  client.ws.send(JSON.stringify(payload))
-}
-
-
-
-
-  broadcast(payload: unknown) {
+  broadcast(payload: WsMessage) {
     for (const client of this.clients.values()) {
       if (client.ws.readyState === WebSocket.OPEN) {
-        client.ws.send(JSON.stringify(payload));
+        client.ws.send(JSON.stringify(payload))
       }
     }
   }
 
-  isOnline(machineId: string): boolean {
-    return this.clients.has(machineId);
+  getClient(machineSerial: string): ClientConnection | undefined {
+    return this.clients.get(machineSerial)
   }
 
-  listOnline() {
-    return [...this.clients.values()].map(c => ({
-      machineId: c.machineId,
-      machineName: c.machineName,
-      machineSerial: c.machineSerial,
-      ip: c.ip,
-      userName: c.userName,
-      displayName: c.displayName,
-      isAlive: c.isAlive
-    }));
+  isOnline(machineSerial: string): boolean {
+    return this.clients.has(machineSerial)
+  }
+
+  listAll() {
+    return [...this.clients.values()].map(async c => {
+
+      const personal = await prisma.personal.findUnique({
+        where: {
+          id: c.personal_id
+        }
+      })
+
+
+      return {
+        machineSerial: c.machineSerial,
+        machineName: c.machineName,
+        displayName: `${personal?.first_name} ${personal?.middle_name} ${personal?.last_name}`,
+        ip: c.ip,
+        isAlive: c.isAlive,
+        connectedAt: c.connectedAt
+      }
+
+    })
   }
 }
 
-export const wsHub = new WsHub();
+export const wsHub = new WsHub()

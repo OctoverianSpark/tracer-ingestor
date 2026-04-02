@@ -1,9 +1,9 @@
 {
   "name": "ingestor",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "dist/server.js",
   "scripts": {
-    "dev": "nodemon --exec node --loader ts-node/esm ./src/server.ts",
+    "dev": "nodemon --exec \"npx tsx ./src/server.ts\" --ext ts,json",
     "build": "tsc",
     "start": "node dist/server.js"
   },
