@@ -4,8 +4,12 @@ import helmet from "helmet"
 import morgan from "morgan"
 import tracerRoutes from "./routes/tracer.routes.js"
 import { pingData } from "./controllers/tracer.controller.js"
-import personalRoutes from "./routes/personal.routes.js"
+import appuserRoutes from "./routes/appuser.routes.js"
 import computerRoutes from "./routes/computer.routes.js"
+import scheduleRoutes from "./routes/schedules.routes.js"
+import programationRoutes from "./routes/programation.routes.js"
+import groupsRouter from "./routes/groups.routes.js"
+import rolesRoutes from "./routes/roles.routes.js"
 
 
 export function startApi() {
@@ -19,8 +23,13 @@ export function startApi() {
 
 
   app.use('/tracer', tracerRoutes)
-  app.use('/personal', personalRoutes)
+  app.use('/appuser', appuserRoutes)
   app.use('/machines', computerRoutes)
+  app.use('/schedules', scheduleRoutes)
+  app.use('/programations', programationRoutes)
+  app.use('/groups', groupsRouter)
+  app.use('/roles', rolesRoutes)
+
 
   app.get("/", pingData)
 

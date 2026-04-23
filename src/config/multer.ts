@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 import type { Request, Response } from "express";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SCREENSHOTS_DIR = path.join(__dirname, "../../screenshots");
+const SCREENSHOTS_DIR = path.join(process.env.SCREENSHOTS_PATH || path.join(__dirname, "../screenshots"));
 
 if (!fs.existsSync(SCREENSHOTS_DIR)) {
   fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });

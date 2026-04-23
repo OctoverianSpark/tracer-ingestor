@@ -14,75 +14,44 @@ model computers {
   ip_address     String?          @db.VarChar(50)
   last_seen      DateTime?        @default(now()) @db.DateTime(0)
   created_at     DateTime?        @default(now()) @db.DateTime(0)
-  updated_at     DateTime?        @updatedAt @db.DateTime(0) // ← added
-  state_logs     state_logs[]
+  updated_at     DateTime?        @updatedAt @db.DateTime(0)
+  appuser_id     BigInt?
   app_usage_logs app_usage_logs[]
-
-  personal_id BigInt? // ← BigInt for consistency
-  personal    personal? @relation(fields: [personal_id], references: [id])
+  appuser        appuser?         @relation(fields: [appuser_id], references: [id])
+  state_logs     state_logs[]
 
   @@index([hostname])
-  @@index([personal_id])
+  @@index([appuser_id])
 }
 
-model users {
-  id            BigInt     @id @default(autoincrement())
-  username      String     @unique @db.VarChar(100)
-  email         String?    @unique @db.VarChar(255)
-  password_hash String     @db.Text
-  role          users_role @default(user)
-  created_at    DateTime?  @default(now()) @db.DateTime(0)
-  updated_at    DateTime?  @updatedAt @db.DateTime(0) // ← added
+model roles {
+  id           Int       @id @default(autoincrement())
+  name         String    @unique
+  access_level Json
+  appuser      appuser[] // ¿los usuarios no tienen rol?
 }
 
-model personal {
-  id                BigInt         @id @default(autoincrement()) // ← BigInt for consistency
-  first_name        String         @db.Text
-  middle_name       String?        @db.Text
-  last_name         String         @db.Text
-  doc_type          Int
-  document          String?        @unique @db.VarChar(150)
-  job_title         String?        @db.VarChar(120)
-  document_type     document_types @relation(fields: [doc_type], references: [id])
-  corporative_email String         @default("")
-  mode_type         Int
-  created_at        DateTime?      @default(now()) @db.DateTime(0) // ← added
-  updated_at        DateTime?      @updatedAt @db.DateTime(0) // ← added
-  time_mesh         time_mesh[]
-  computers         computers[]
-  mode              modes          @relation(fields: [mode_type], references: [id])
+model appuser {
+  id         BigInt      @id @default(autoincrement())
+  full_name  String      @db.Text
+  email      String      @unique
+  role_id    Int? // relación con roles
+  role       roles?      @relation(fields: [role_id], references: [id])
+  created_at DateTime?   @default(now()) @db.DateTime(0)
+  updated_at DateTime?   @updatedAt @db.DateTime(0)
+  computers  computers[]
+  schedules  schedules[]
+  group_id   Int? // renombrado para claridad
+  group      groups?     @relation(fields: [group_id], references: [id])
 
-  @@index([doc_type, mode_type])
+  @@index([group_id])
+  @@index([role_id])
 }
 
-model modes {
-  id       Int        @id @default(autoincrement())
-  name     String     @db.Text
-  personal personal[]
-}
-
-model document_types {
-  id         Int        @id @default(autoincrement())
-  full_name  String     @db.VarChar(120)
-  short_name String     @db.VarChar(60)
-  value      String?    @db.VarChar(120)
-  active     Int?       @db.TinyInt
-  personal   personal[]
-}
-
-model time_mesh {
-  id          BigInt    @id @default(autoincrement()) // ← BigInt for consistency
-  user_id     BigInt // ← BigInt to match personal.id
-  day_of_week Int       @db.TinyInt // ← ADDED: 0=Sun … 6=Sat
-  start       DateTime  @db.Time(0)
-  end         DateTime  @db.Time(0)
-  break       DateTime  @db.Time(0)
-  lunch       DateTime  @db.Time(0)
-  overtime    DateTime? @db.Time(0)
-  personal    personal  @relation(fields: [user_id], references: [id])
-
-  @@unique([user_id, day_of_week]) // ← one schedule per person per day
-  @@index([user_id])
+model groups {
+  id      Int       @id @default(autoincrement())
+  name    String    @unique // era group_name, redundante con el modelo
+  appuser appuser[]
 }
 
 model state_logs {
@@ -108,14 +77,34 @@ model app_usage_logs {
   computer_id    BigInt
   interval_start DateTime  @db.DateTime(0)
   interval_end   DateTime  @db.DateTime(0)
-  // Json is flexible but not filterable at DB level.
-  // If you need to query by app name later, consider a separate app_usage_entries table.
   apps           Json
   computer       computers @relation(fields: [computer_id], references: [id])
 
   @@index([computer_id])
   @@index([interval_start])
   @@index([computer_id, interval_start])
+}
+
+model programation {
+  id          BigInt      @id @default(autoincrement())
+  name        String      @unique @db.VarChar(255)
+  start_day   String
+  start_lunch String
+  end_lunch   String
+  end_day     String
+  schedules   schedules[]
+}
+
+model schedules {
+  id              BigInt       @id @default(autoincrement())
+  appuser_id      BigInt
+  programation_id BigInt
+  day_of_week     String       @db.VarChar(20)
+  appuser         appuser      @relation(fields: [appuser_id], references: [id])
+  programation    programation @relation(fields: [programation_id], references: [id])
+
+  @@index([appuser_id])
+  @@index([programation_id])
 }
 
 enum state_log_state {

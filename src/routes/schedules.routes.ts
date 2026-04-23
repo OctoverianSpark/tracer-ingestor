@@ -1,0 +1,15 @@
+import { Router } from "express";
+import schedulesController from "../controllers/schedules/schedules.controller";
+
+
+
+const scheduleRoutes = Router()
+
+scheduleRoutes.get('/', schedulesController.getAll)
+scheduleRoutes.post('/save', schedulesController.saveSchedules)
+scheduleRoutes.get('/find/:id', schedulesController.getById)
+scheduleRoutes.put('/update/:id', schedulesController.update)
+scheduleRoutes.delete('/delete/:id', schedulesController.delete)
+
+
+export default scheduleRoutes

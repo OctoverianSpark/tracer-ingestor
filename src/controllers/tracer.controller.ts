@@ -1,10 +1,8 @@
-import type { Request, Response } from "express"
-import type { BatchPayload } from "../types/tracer.js"
-
-import path from "path";
-import fs from "fs";
-import { app_usage_logs, state_log_category, state_log_state, state_log_type, state_logs } from "@prisma/client";
+import type { Request, Response } from "express";
+import { state_log_category, state_log_state, state_log_type, state_logs, programation } from "@prisma/client";
 import prisma from "../lib/prisma.js";
+import Controller from "./controller.js";
+import programationService, { type ProgramationService } from "../services/schedules/programation.service.js";
 
 const stateMap: Record<number, state_log_state> = {
   0: "working",
@@ -13,189 +11,130 @@ const stateMap: Record<number, state_log_state> = {
   3: "lunch",
   4: "idle",
   5: "offline"
-}
+};
 
 const categoryMap: Record<number, state_log_category> = {
   0: "active",
   1: "neutral",
   2: "inactive"
-}
+};
 
 const typeMap: Record<number, state_log_type> = {
   0: "auto",
   1: "manual"
-}
+};
 
+class TracerController extends Controller<ProgramationService> {
+  protected service = programationService;
 
-export async function getStateLogs(req: Request, res: Response) {
-  const { personal_id } = req.query
-
-  const id = Number(personal_id)
-
-  const computer = await prisma.computers.findFirst({
-    where: {
-      personal_id: id
-    }
-  })
-
-  if (!computer) return res.status(404).json({
-    error: 'Computador no encontrado'
-  })
-  console.log(computer.id);
-
-
-  const data = await prisma.state_logs.findMany({
-    where: {
-      computer_id: computer.id
-    }
-  })
-
-
-  console.log(data);
-  return res.status(200).json({
-    ok: true,
-    data
-  })
-
-
-
-
-}
-export async function syncStates(req: Request, res: Response) {
-  try {
-    const payload = req.body as {
-      WorkerId: string
-      WorkerUserName: string
-
-      Category: number
-      State: number
-      Type: number
-      Timestamp: string
-    }[]
-    const workerId = payload[0]?.WorkerId
-
-    if (!workerId) return res.status(400).json({ error: "No WorkerId" })
-
-
-    const computer = await prisma.computers.findFirst({
-      where: { hostname: workerId }
-    })
-
-    if (!computer) {
-      return res.status(404).json({ error: "Computer not found" })
-    }
-
-
-    await prisma.state_logs.createMany({
-      data: payload.map(log => ({
-        computer_id: computer.id,
-        user_name: log.WorkerUserName,
-        state: stateMap[log.State],
-        category: categoryMap[log.Category],
-        type: typeMap[log.Type],
-        timestamp: new Date(log.Timestamp)
-      } as state_logs))
-    })
-
-    res.json({ ok: true, count: payload.length })
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: "Failed to sync states" })
+  async getStateLogs(req: Request, res: Response) {
+    const { computer_id } = req.query;
+    const data = await prisma.state_logs.findMany({
+      where: { computer_id: Number(computer_id) }
+    });
+    return res.status(200).json({ ok: true, data });
   }
-}
-export async function syncAppUsage(req: Request, res: Response) {
-  try {
-    const payload = req.body as {
-      WorkerId: string
-      WorkerUserName: string
-      IntervalStart: string
-      IntervalEnd: string
-      Apps: string
-    }[]
 
-    const workerId = payload[0]?.WorkerId
-    console.log(workerId);
+  async syncStates(req: Request, res: Response) {
+    try {
+      const payload = req.body as {
+        WorkerId: string;
+        WorkerUserName: string;
+        Category: number;
+        State: number;
+        Type: number;
+        Timestamp: string;
+      }[];
 
-    if (!workerId) return res.status(400).json({ error: "No WorkerId" })
+      const workerId = payload[0]?.WorkerId;
+      if (!workerId) return res.status(400).json({ error: "No WorkerId" });
 
+      const computer = await prisma.computers.findFirst({
+        where: { hostname: workerId }
+      });
+      if (!computer) return res.status(404).json({ error: "Computer not found" });
 
-    const computer = await prisma.computers.findFirst({
-      where: { hostname: workerId }
-    })
+      await prisma.state_logs.createMany({
+        data: payload.map(log => ({
+          computer_id: computer.id,
+          user_name: log.WorkerUserName,
+          state: stateMap[log.State],
+          category: categoryMap[log.Category],
+          type: typeMap[log.Type],
+          timestamp: new Date(log.Timestamp)
+        } as state_logs))
+      });
 
-    if (!computer) {
-      return res.status(404).json({ error: "Computer not found" })
+      res.json({ ok: true, count: payload.length });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Failed to sync states" });
     }
+  }
 
+  async syncAppUsage(req: Request, res: Response) {
+    try {
+      const payload = req.body as {
+        WorkerId: string;
+        WorkerUserName: string;
+        IntervalStart: string;
+        IntervalEnd: string;
+        Apps: string;
+      }[];
 
-    // Usa createMany en lugar de forEach para eficiencia
-    await prisma.app_usage_logs.createMany({
-      data: payload.map(log => ({
-        computer_id: computer.id,
-        interval_start: new Date(log.IntervalStart),
-        interval_end: new Date(log.IntervalEnd),
-        apps: JSON.parse(log.Apps)
-      }))
-    })
+      const workerId = payload[0]?.WorkerId;
+      console.log(workerId);
+      if (!workerId) return res.status(400).json({ error: "No WorkerId" });
 
-    res.json({ ok: true, count: payload.length })
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: "Failed to sync app usage" })
+      const computer = await prisma.computers.findFirst({
+        where: { hostname: workerId }
+      });
+      if (!computer) return res.status(404).json({ error: "Computer not found" });
+
+      await prisma.app_usage_logs.createMany({
+        data: payload.map(log => ({
+          computer_id: computer.id,
+          interval_start: new Date(log.IntervalStart),
+          interval_end: new Date(log.IntervalEnd),
+          apps: JSON.parse(log.Apps)
+        }))
+      });
+
+      res.json({ ok: true, count: payload.length });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Failed to sync app usage" });
+    }
+  }
+
+  async pingData(_req: Request, res: Response) {
+    console.log("API CONNECTED WITH TRACER");
+    res.json({ msg: { text: "Hello" } });
+  }
+
+  async ProgramationSave(req: Request, res: Response) {
+    const data = req.body as programation;
+    console.log(data);
+    const saved = await this.service.save(data);
+    res.status(201).json(saved);
+  }
+
+  async GetProgramations(_req: Request, res: Response) {
+    const data = await this.service.getAll();
+    res.json({ ok: true, data });
+  }
+
+  async GetSchedules(_req: Request, res: Response) {
+    const data = await prisma.schedules.findMany();
+    res.json({ ok: true, data });
+  }
+
+  async SchedulePersonal(req: Request, _res: Response) {
+    const { body } = req;
+    console.log(body);
   }
 }
 
-export async function pingData(req: Request, res: Response) {
-
-  console.log("API CONNECTED WITH TRACER")
-
-
-
-  res.json({
-    msg: {
-      text: "Hello"
-    }
-  })
-}
-
-
-export async function getBatchData(req: Request, res: Response) {
-
-  console.log("GET BATCH DATA FUNCTION");
-
-
-
-
-}
-
-
-
-
-export async function saveScreenShot(req: Request, res: Response) {
-  try {
-
-    const file = req.file;
-    const machine = req.body?.machine as string;
-
-    if (!file) {
-      console.log("[SCREENSHOT] ERROR: No file");
-      res.status(400).json({ error: "No file provided" });
-      return;
-    }
-
-    if (!machine) {
-      console.log("[SCREENSHOT] ERROR: Missing machine or user | machine:", machine);
-      res.status(400).json({ error: "Missing machine or user fields" });
-      return;
-    }
-
-    return res.status(200).json({
-      ok: true,
-      message: "Screenshot saved successfully",
-    })
-
-  } catch (ex) {
-    console.error(`[SCREENSHOT ERROR] ${(ex as Error).message}`);
-    res.status(500).json({ error: "Failed to save screenshot" });
-  }
-}
+const tracerController = new TracerController();
+export const { getStateLogs, syncStates, syncAppUsage, pingData, ProgramationSave, GetProgramations, GetSchedules, SchedulePersonal } = tracerController;
+export default tracerController;

@@ -30,7 +30,7 @@ export
   isAlive: boolean;
   ip: string;
   connectedAt: Date;
-  personal_id: bigint;
+  appuser_id: bigint;
 }
 
 

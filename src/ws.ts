@@ -5,7 +5,7 @@ import { wsHub } from "./wsHub.js";
 import type { ClientConnection } from "./types/tracer.js";
 import prisma from "./lib/prisma.js";
 
-const wss = new WebSocketServer({ port: 8080, host: '0.0.0.0' });
+const wss = new WebSocketServer({ port: 8080 });
 
 export const startWs = () => {
 
@@ -30,11 +30,11 @@ export const startWs = () => {
 
       const payload = decoded as ClientConnection & { email: string }
 
-      const employee = await prisma.personal.findFirst({
-        where: { corporative_email: payload.email }
+      const appuser = await prisma.appuser.findFirst({
+        where: { email: payload.email }
       })
 
-      if (!employee) {
+      if (!appuser) {
         ws.close();
         return;
       }
@@ -42,14 +42,14 @@ export const startWs = () => {
 
 
       wsHub.addClient({
-        ws,
+        ws: ws,
         machineSerial: payload.machineSerial,
         machineName: payload.machineName,
         ip: payload.ip,
         isAlive: true,
         connectedAt: new Date(),
-        personal_id: employee.id
-      });
+        appuser_id: appuser.id
+      }, ws);
 
 
 
