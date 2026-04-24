@@ -1,5 +1,4 @@
-# ─── Build stage ───────────────────────────────────────────────────────────────
-FROM node:22-alpine AS builder
+FROM node:22-alpine
 
 WORKDIR /app
 
@@ -11,24 +10,9 @@ COPY prisma ./prisma/
 COPY src ./src/
 
 RUN npx prisma generate
-RUN npm run build
-
-# ─── Production stage ──────────────────────────────────────────────────────────
-FROM node:22-alpine AS runner
-
-WORKDIR /app
-
-COPY package*.json ./
-RUN npm ci --omit=dev
-
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY prisma ./prisma/
-
 RUN mkdir -p screenshots
 
 EXPOSE 3000
 EXPOSE 8080
 
-CMD ["node", "dist/server.js"]
+CMD ["npx", "tsx", "src/server.ts"]
