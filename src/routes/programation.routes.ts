@@ -1,5 +1,5 @@
 import { Router } from "express";
-import programationController from "../controllers/schedules/programation.controller";
+import programationController from "../controllers/schedules/programation.controller.js";
 
 
 const programationRoutes = Router()

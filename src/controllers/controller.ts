@@ -1,4 +1,4 @@
-import Service from "../services/service"
+import Service from "../services/service.js"
 import { Request, Response } from "express";
 
 export default abstract class Controller<TService extends Service<any, any, any, any, any>> {

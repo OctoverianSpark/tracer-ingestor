@@ -1,5 +1,5 @@
-import groupsService, { GroupService } from "../../services/appuser/groups.service";
-import Controller from "../controller";
+import groupsService, { GroupService } from "../../services/appuser/groups.service.js";
+import Controller from "../controller.js";
 
 
 class GroupController extends Controller<GroupService> {

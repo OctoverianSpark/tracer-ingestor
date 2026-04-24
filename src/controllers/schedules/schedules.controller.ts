@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
-import scheduleService, { ScheduleService } from "../../services/schedules/schedule.service";
-import Controller from "../controller";
+import scheduleService, { ScheduleService } from "../../services/schedules/schedule.service.js";
+import Controller from "../controller.js";
 
 class ScheduleController extends Controller<ScheduleService> {
   protected service = scheduleService

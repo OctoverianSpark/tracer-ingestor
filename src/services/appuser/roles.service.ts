@@ -1,6 +1,6 @@
 import { Prisma, roles } from "@prisma/client";
-import Service from "../service";
-import prisma from "../../lib/prisma";
+import Service from "../service.js";
+import prisma from "../../lib/prisma.js";
 
 class RoleService extends Service<roles, Prisma.rolesCreateInput, Prisma.rolesUpdateInput, Prisma.rolesWhereInput, Prisma.rolesWhereUniqueInput> {
 

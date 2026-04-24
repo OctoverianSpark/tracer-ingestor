@@ -1,5 +1,5 @@
-import rolesService, { RoleService } from "../../services/appuser/roles.service";
-import Controller from "../controller";
+import rolesService, { RoleService } from "../../services/appuser/roles.service.js";
+import Controller from "../controller.js";
 
 class RolesController extends Controller<RoleService> {
 

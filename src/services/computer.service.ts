@@ -1,7 +1,7 @@
 import { computers, Prisma } from "@prisma/client";
-import type { ClientConnection } from "../types/tracer";
-import prisma from "../lib/prisma";
-import Service from "./service";
+import type { ClientConnection } from "../types/tracer.js";
+import prisma from "../lib/prisma.js";
+import Service from "./service.js";
 
 
 

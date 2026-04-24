@@ -1,5 +1,5 @@
 import { Router } from "express";
-import schedulesController from "../controllers/schedules/schedules.controller";
+import schedulesController from "../controllers/schedules/schedules.controller.js";
 
 
 

@@ -1,7 +1,3 @@
-import { personalWhereInput, personalWhereUniqueInput } from "../generated/prisma/models";
-import prisma from "../lib/prisma";
-
-
 
 export default abstract class Service<T, CreateInput, UpdateInput, WhereInput, WhereUniqueInput> {
 

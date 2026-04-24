@@ -1,5 +1,5 @@
-import programationService, { ProgramationService } from "../../services/schedules/programation.service";
-import Controller from "../controller";
+import programationService, { ProgramationService } from "../../services/schedules/programation.service.js";
+import Controller from "../controller.js";
 
 class ProgramationController extends Controller<ProgramationService> {
 
