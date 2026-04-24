@@ -1,0 +1,36 @@
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: tracer
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ingestor:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+      - "8080:8080"
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      DB_URL: mysql://root:${MYSQL_ROOT_PASSWORD:-root}@db:3306/tracer
+      SCREENSHOTS_PATH: screenshots/
+    volumes:
+      - screenshots:/app/screenshots
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
+  screenshots:
