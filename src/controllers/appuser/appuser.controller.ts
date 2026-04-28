@@ -31,6 +31,23 @@ class PersonalController extends Controller<AppUserService> {
 
   }
 
+  async deleteMany(req: Request, res: Response) {
+
+    const { ids } = req.body
+    console.log(ids);
+
+    try {
+
+      const data = await this.service.deleteMany(ids)
+
+      return res.status(200).json(data)
+    } catch (error) {
+      console.log(error);
+
+      return res.status(404).json({ error })
+    }
+  }
+
 
 
 }

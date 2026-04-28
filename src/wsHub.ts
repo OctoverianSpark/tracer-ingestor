@@ -13,6 +13,7 @@ class WsHub {
     for (const client of existingClients) {
       this.clients.set(client.serial_number!, {
         ws: null as unknown as WebSocket,
+        userName: client.username ?? "Unknown",
         machineName: client.hostname,
         machineSerial: client.serial_number!,
         ip: client.ip_address ?? "",
@@ -42,13 +43,16 @@ class WsHub {
         create: {
           hostname: client.machineName,
           serial_number: client.machineSerial,
+          username: client.userName,
           ip_address: client.ip,
           appuser_id: client.appuser_id,
           last_seen: new Date()
         },
         update: {
-          serial_number: client.machineSerial,
+          hostname: client.machineName,
+
           ip_address: client.ip,
+          username: client.userName,
           last_seen: new Date()
         }
       });
@@ -124,6 +128,7 @@ class WsHub {
       hostname: c.machineName,
       displayName: appuserMap.get(String(c.appuser_id))?.full_name ?? "Unknown",
       ip_address: c.ip,
+      username: c.userName,
       isAlive: this.isOnline(c.machineSerial),
       last_seen: c.connectedAt
     }));

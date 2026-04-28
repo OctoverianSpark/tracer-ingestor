@@ -11,13 +11,14 @@ model computers {
   id             BigInt           @id @default(autoincrement())
   serial_number  String?          @unique @db.VarChar(255)
   hostname       String           @unique @db.VarChar(255)
+  username       String?          @db.VarChar(255)
   ip_address     String?          @db.VarChar(50)
   last_seen      DateTime?        @default(now()) @db.DateTime(0)
   created_at     DateTime?        @default(now()) @db.DateTime(0)
   updated_at     DateTime?        @updatedAt @db.DateTime(0)
   appuser_id     BigInt?
   app_usage_logs app_usage_logs[]
-  appuser        appuser?         @relation(fields: [appuser_id], references: [id])
+  appuser        appuser?         @relation(fields: [appuser_id], references: [id], onDelete: SetNull)
   state_logs     state_logs[]
 
   @@index([hostname])
@@ -97,10 +98,10 @@ model programation {
 
 model schedules {
   id              BigInt       @id @default(autoincrement())
-  appuser_id      BigInt
+  appuser_id      BigInt?
   programation_id BigInt
   day_of_week     String       @db.VarChar(20)
-  appuser         appuser      @relation(fields: [appuser_id], references: [id])
+  appuser         appuser?     @relation(fields: [appuser_id], references: [id], onDelete: SetNull)
   programation    programation @relation(fields: [programation_id], references: [id])
 
   @@index([appuser_id])

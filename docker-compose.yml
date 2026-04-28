@@ -8,7 +8,7 @@ services:
     environment:
       JWT_SECRET: ${JWT_SECRET}
       DB_URL: ${DB_URL}
-      SCREENSHOTS_PATH: screenshots/
+      SCREENSHOTS_PATH: ${SCREENSHOTS_PATH}
     volumes:
       - screenshots:/app/screenshots
 

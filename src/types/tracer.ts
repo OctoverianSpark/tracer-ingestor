@@ -27,6 +27,7 @@ export
   ws: WebSocket;
   machineName: string;
   machineSerial: string;
+  userName: string;
   isAlive: boolean;
   ip: string;
   connectedAt: Date;

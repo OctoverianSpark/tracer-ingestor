@@ -10,7 +10,7 @@ import Controller from "./controller.js";
 import computerService, { type ComputerService } from "../services/computer.service.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SCREENSHOTS_DIR = path.join(__dirname, '..', '..', "screenshots");
+const SCREENSHOTS_DIR = path.join(process.env.SCREENSHOTS_PATH || "../screenshots");
 
 class ComputerController extends Controller<ComputerService> {
   protected service = computerService;
