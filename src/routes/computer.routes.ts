@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { listMachines, lockMachine, notifyMachine, sendFileToMachine, getReport, getScreenshot, getAll } from "../controllers/computer.controller.js"
+import computerController, { listMachines, lockMachine, notifyMachine, sendFileToMachine, getReport, getScreenshot, getAll } from "../controllers/computer.controller.js"
 import { upload } from "../config/multer.js";
 import multer from "multer";
 
@@ -11,6 +11,7 @@ const computerRoutes = Router()
 computerRoutes.post("/:serial/lock", lockMachine)
 computerRoutes.post("/:serial/notify", notifyMachine)
 computerRoutes.get("/", getAll)
+computerRoutes.delete("/delete/:serial", computerController.deleteBySerial)
 computerRoutes.get("/list", listMachines)
 computerRoutes.get("/get-report", getReport)
 computerRoutes.post('/:serial/send-file', (req, res, next) => {

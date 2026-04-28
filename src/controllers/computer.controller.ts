@@ -15,6 +15,25 @@ const SCREENSHOTS_DIR = path.join(process.env.SCREENSHOTS_PATH || "../screenshot
 class ComputerController extends Controller<ComputerService> {
   protected service = computerService;
 
+  async deleteBySerial(req: Request, res: Response) {
+    const { serial } = req.params;
+    try {
+
+      const computer = await this.service.getByUnique({ serial_number: String(serial) });
+      if (!computer) {
+        return res.status(404).json({ error: "Computer not found" });
+      }
+
+      const { id } = computer;
+
+      await this.service.delete(id);
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Error deleting computer:", error);
+      res.status(500).json({ error: "Failed to delete computer" });
+    }
+
+  }
   async lockMachine(req: Request, res: Response) {
     const { serial } = req.params;
     const msg = createAction(ActionMessageTypes.Lock);
