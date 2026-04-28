@@ -29,21 +29,21 @@ model roles {
   id           Int       @id @default(autoincrement())
   name         String    @unique
   access_level Json
-  appuser      appuser[] // ¿los usuarios no tienen rol?
+  appuser      appuser[]
 }
 
 model appuser {
   id         BigInt      @id @default(autoincrement())
   full_name  String      @db.Text
   email      String      @unique
-  role_id    Int? // relación con roles
-  role       roles?      @relation(fields: [role_id], references: [id])
+  role_id    Int?
+  role       roles?      @relation(fields: [role_id], references: [id], onDelete: SetNull)
   created_at DateTime?   @default(now()) @db.DateTime(0)
   updated_at DateTime?   @updatedAt @db.DateTime(0)
   computers  computers[]
   schedules  schedules[]
-  group_id   Int? // renombrado para claridad
-  group      groups?     @relation(fields: [group_id], references: [id])
+  group_id   Int?
+  group      groups?     @relation(fields: [group_id], references: [id], onDelete: SetNull)
 
   @@index([group_id])
   @@index([role_id])
@@ -51,20 +51,20 @@ model appuser {
 
 model groups {
   id      Int       @id @default(autoincrement())
-  name    String    @unique // era group_name, redundante con el modelo
+  name    String    @unique
   appuser appuser[]
 }
 
 model state_logs {
   id          BigInt             @id @default(autoincrement())
-  computer_id BigInt
+  computer_id BigInt?
   user_name   String?            @db.VarChar(100)
   state       state_log_state
   category    state_log_category
   type        state_log_type
   timestamp   DateTime           @db.DateTime(0)
   reason      String?            @db.VarChar(255)
-  computer    computers          @relation(fields: [computer_id], references: [id])
+  computer    computers?         @relation(fields: [computer_id], references: [id], onDelete: SetNull)
 
   @@index([computer_id])
   @@index([timestamp])
@@ -74,12 +74,12 @@ model state_logs {
 }
 
 model app_usage_logs {
-  id             BigInt    @id @default(autoincrement())
-  computer_id    BigInt
-  interval_start DateTime  @db.DateTime(0)
-  interval_end   DateTime  @db.DateTime(0)
+  id             BigInt     @id @default(autoincrement())
+  computer_id    BigInt?
+  interval_start DateTime   @db.DateTime(0)
+  interval_end   DateTime   @db.DateTime(0)
   apps           Json
-  computer       computers @relation(fields: [computer_id], references: [id])
+  computer       computers? @relation(fields: [computer_id], references: [id], onDelete: SetNull)
 
   @@index([computer_id])
   @@index([interval_start])
@@ -102,7 +102,7 @@ model schedules {
   programation_id BigInt
   day_of_week     String       @db.VarChar(20)
   appuser         appuser?     @relation(fields: [appuser_id], references: [id], onDelete: SetNull)
-  programation    programation @relation(fields: [programation_id], references: [id])
+  programation    programation @relation(fields: [programation_id], references: [id], onDelete: Cascade)
 
   @@index([appuser_id])
   @@index([programation_id])
