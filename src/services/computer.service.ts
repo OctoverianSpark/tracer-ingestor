@@ -19,6 +19,10 @@ class ComputerService extends Service<computers, Prisma.computersCreateInput, Pr
     })
   }
 
+  async deleteBySerial(serial: string) {
+    return await this.model.delete({ where: { serial_number: serial } });
+  }
+
 }
 
 
