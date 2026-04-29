@@ -50,14 +50,10 @@ export default abstract class Controller<TService extends Service<any, any, any,
 
   async getAll(req: Request, res: Response) {
     try {
-      const { limit, offset } = req.query;
-      console.log('Query params:', { limit, offset });
-
-      const data = await this.service.getAll();
+      const { limit, offset } = this.parseQuery(req);
+      const data = await this.service.getAll(limit, offset);
       res.status(200).json(data);
     } catch (error: any) {
-      console.log(error);
-
       res.status(500).json({ ok: false, error: error.message });
     }
   }

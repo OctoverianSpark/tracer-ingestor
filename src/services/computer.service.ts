@@ -12,7 +12,7 @@ class ComputerService extends Service<computers, Prisma.computersCreateInput, Pr
 
 
   async upsert(data: Prisma.computersCreateInput) {
-    this.model.upsert({
+    return await this.model.upsert({
       where: { hostname: data.hostname },
       create: data,
       update: data

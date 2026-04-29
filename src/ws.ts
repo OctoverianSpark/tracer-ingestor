@@ -9,8 +9,10 @@ const wss = new WebSocketServer({ port: 8080 });
 
 export const startWs = () => {
 
-  wsHub.initialize()
-  console.log("WebSocket running on 8080")
+  wsHub.initialize();
+  console.log("WebSocket running on 8080");
+  process.on("SIGTERM", () => wsHub.shutdown());
+  process.on("SIGINT", () => wsHub.shutdown());
   wss.on("connection", async (ws, req) => {
     try {
 
@@ -54,8 +56,13 @@ export const startWs = () => {
 
 
 
+      ws.on("pong", () => {
+        const client = wsHub.getClient(payload.machineSerial);
+        if (client) client.isAlive = true;
+      });
+
       ws.on("close", () => {
-        wsHub.shutdownClient(payload.machineSerial)
+        wsHub.shutdownClient(payload.machineSerial);
       });
 
       ws.on("message", data => {

@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { state_log_category, state_log_state, state_log_type, state_logs, programation } from "@prisma/client";
+import { state_log_category, state_log_state, state_log_type, programation } from "@prisma/client";
 import prisma from "../lib/prisma.js";
 import Controller from "./controller.js";
 import programationService, { type ProgramationService } from "../services/schedules/programation.service.js";
@@ -29,8 +29,9 @@ class TracerController extends Controller<ProgramationService> {
 
   async getStateLogs(req: Request, res: Response) {
     const { computer_id } = req.query;
+    if (!computer_id) return res.status(400).json({ error: "Missing computer_id" });
     const data = await prisma.state_logs.findMany({
-      where: { computer_id: Number(computer_id) }
+      where: { computer_id: BigInt(computer_id as string) }
     });
     return res.status(200).json({ ok: true, data });
   }
@@ -54,16 +55,15 @@ class TracerController extends Controller<ProgramationService> {
       });
       if (!computer) return res.status(404).json({ error: "Computer not found" });
 
-      await prisma.state_logs.createMany({
-        data: payload.map(log => ({
-          computer_id: computer.id,
-          user_name: log.WorkerUserName,
-          state: stateMap[log.State],
-          category: categoryMap[log.Category],
-          type: typeMap[log.Type],
-          timestamp: new Date(log.Timestamp)
-        } as state_logs))
+      const rows = payload.map(log => {
+        const state = stateMap[log.State];
+        const category = categoryMap[log.Category];
+        const type = typeMap[log.Type];
+        if (!state || !category || !type) throw new Error(`Unknown enum value in log: State=${log.State} Category=${log.Category} Type=${log.Type}`);
+        return { computer_id: computer.id, user_name: log.WorkerUserName, state, category, type, timestamp: new Date(log.Timestamp) };
       });
+
+      await prisma.state_logs.createMany({ data: rows });
 
       res.json({ ok: true, count: payload.length });
     } catch (err) {
@@ -129,9 +129,8 @@ class TracerController extends Controller<ProgramationService> {
     res.json({ ok: true, data });
   }
 
-  async SchedulePersonal(req: Request, _res: Response) {
-    const { body } = req;
-    console.log(body);
+  async SchedulePersonal(_req: Request, res: Response) {
+    res.status(501).json({ error: "Not implemented" });
   }
 }
 

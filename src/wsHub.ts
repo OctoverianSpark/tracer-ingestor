@@ -5,6 +5,7 @@ import prisma from "./lib/prisma.js";
 
 class WsHub {
   private clients = new Map<string, ClientConnection>();
+  private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 
   async initialize() {
     const existingClients = await prisma.computers.findMany({
@@ -23,6 +24,18 @@ class WsHub {
       });
       console.log(`🟢 ${client.hostname} loaded from database`);
     }
+
+    this.heartbeatInterval = setInterval(() => {
+      for (const [serial, client] of this.clients.entries()) {
+        if (!client.ws || client.ws.readyState !== WebSocket.OPEN) continue;
+        if (!client.isAlive) {
+          this.shutdownClient(serial);
+          continue;
+        }
+        client.isAlive = false;
+        client.ws.ping();
+      }
+    }, 30_000);
   }
 
   private findClient(machineSerial: string) {
@@ -32,34 +45,33 @@ class WsHub {
   async addClient(client: ClientConnection, ws: WebSocket) {
     const existing = this.findClient(client.machineSerial);
 
-    if (existing) {
-      existing.ws = ws;
-      existing.isAlive = true;
-      existing.connectedAt = new Date();
-      console.log(`🟢 ${client.machineName} re-connected`);
-    } else {
-      await prisma.computers.upsert({
-        where: { hostname: client.machineName },
-        create: {
-          hostname: client.machineName,
-          serial_number: client.machineSerial,
-          username: client.userName,
-          ip_address: client.ip,
-          appuser_id: client.appuser_id,
-          last_seen: new Date()
-        },
-        update: {
-          hostname: client.machineName,
+    await prisma.computers.upsert({
+      where: { hostname: client.machineName },
+      create: {
+        hostname: client.machineName,
+        serial_number: client.machineSerial,
+        username: client.userName,
+        ip_address: client.ip,
+        appuser_id: client.appuser_id,
+        last_seen: new Date()
+      },
+      update: {
+        ip_address: client.ip,
+        username: client.userName,
+        last_seen: new Date()
+      }
+    });
 
-          ip_address: client.ip,
-          username: client.userName,
-          last_seen: new Date()
-        }
-      });
-      console.log(`🟢 ${client.machineName} connected`);
+    console.log(`🟢 ${client.machineName} ${existing ? "re-connected" : "connected"}`);
+    this.clients.set(client.machineSerial, { ...client, ws, isAlive: true, connectedAt: new Date() });
+  }
+
+  shutdown() {
+    if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+    for (const client of this.clients.values()) {
+      if (client.ws) client.ws.close(1001, "Server shutting down");
     }
-
-    this.clients.set(client.machineSerial, { ...client, ws });
+    this.clients.clear();
   }
 
   removeClient(machineSerial: string) {
@@ -78,6 +90,11 @@ class WsHub {
     client.ws = null as unknown as WebSocket;
     client.isAlive = false;
     console.log(`🔴 ${client.machineName} disconnected`);
+
+    prisma.computers.updateMany({
+      where: { serial_number: machineSerial },
+      data: { last_seen: new Date() }
+    }).catch(err => console.error("[shutdownClient] last_seen update failed:", err));
   }
 
   sendTo(serialNumber: string, payload: WsMessage) {
@@ -118,7 +135,8 @@ class WsHub {
     ];
 
     const appusers = await prisma.appuser.findMany({
-      where: { id: { in: appuserIds } }
+      where: { id: { in: appuserIds } },
+      select: { id: true, full_name: true }
     });
 
     const appuserMap = new Map(appusers.map(u => [String(u.id), u]));

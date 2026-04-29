@@ -77,15 +77,15 @@ class ComputerController extends Controller<ComputerService> {
 
   async getReport(req: Request, res: Response) {
     const { computername, date } = req.query as { computername: string; date: string };
-    console.log(computername, date);
     if (!computername || !date) {
       res.status(400).json({ error: "Missing computername or date query parameters" });
       return;
     }
+    if (!/^[a-zA-Z0-9_\-\.]+$/.test(computername)) {
+      return res.status(400).json({ error: "Invalid computername" });
+    }
     try {
-      console.log(computername);
       const allFiles = readdirSync(path.join(SCREENSHOTS_DIR, computername));
-      console.log(allFiles);
       const matched = allFiles.filter(file => file.includes(date));
       res.json({ ok: true, files: matched });
     } catch (ex) {
@@ -97,14 +97,15 @@ class ComputerController extends Controller<ComputerService> {
   async getScreenshot(req: Request, res: Response) {
     try {
       const { filename, machine } = req.params as { filename: string; machine: string };
-      console.log(filename, machine);
+      if (!/^[a-zA-Z0-9_\-\.]+$/.test(machine) || !/^[a-zA-Z0-9_\-\.]+$/.test(filename)) {
+        return res.status(400).json({ error: "Invalid path parameter" });
+      }
       const files = readdirSync(path.join(SCREENSHOTS_DIR, machine));
       if (!files.includes(filename)) {
         res.status(404).json({ error: "Screenshot not found" });
         return;
       }
       const filePath = path.join(SCREENSHOTS_DIR, machine, filename);
-      console.log(filePath);
       res.sendFile(filePath);
     } catch (err) {
       console.error("[GET SCREENSHOT ERROR]", (err as Error).message);
