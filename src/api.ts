@@ -10,6 +10,8 @@ import scheduleRoutes from "./routes/schedules.routes.js"
 import programationRoutes from "./routes/programation.routes.js"
 import groupsRouter from "./routes/groups.routes.js"
 import rolesRoutes from "./routes/roles.routes.js"
+import categorizationAppsRoutes from "./routes/categorization_apps.routes.js"
+import appUsageLogsRoutes from "./routes/app_usage_logs.routes.js"
 
 
 export function startApi() {
@@ -34,6 +36,8 @@ export function startApi() {
   app.use('/programations', programationRoutes)
   app.use('/groups', groupsRouter)
   app.use('/roles', rolesRoutes)
+  app.use('/categorization-apps', categorizationAppsRoutes)
+  app.use('/app-usage-logs', appUsageLogsRoutes)
 
 
   app.get("/", pingData)

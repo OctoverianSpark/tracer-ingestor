@@ -108,6 +108,17 @@ model schedules {
   @@index([programation_id])
 }
 
+model categorization_apps {
+  id       BigInt   @id @default(autoincrement())
+  name     String   @db.VarChar(255)
+  category category
+}
+
+enum category {
+  productive
+  unproductive
+}
+
 enum state_log_state {
   working
   break
