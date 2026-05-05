@@ -153,6 +153,8 @@ class WsHub {
       displayName: appuserMap.get(String(c.appuser_id))?.full_name ?? "Unknown",
       ip_address: c.ip,
       username: c.userName,
+      machineBrand: c.machineBrand,
+      machineModel: c.machineModel,
       isAlive: this.isOnline(c.machineSerial),
       last_seen: c.connectedAt
     }));
