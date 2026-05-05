@@ -17,6 +17,8 @@ class WsHub {
         userName: client.username ?? "Unknown",
         machineName: client.hostname,
         machineSerial: client.serial_number!,
+        machineBrand: client.machineBrand ?? "",
+        machineModel: client.machineModel ?? "",
         ip: client.ip_address ?? "",
         isAlive: false,
         connectedAt: new Date(),
@@ -52,12 +54,16 @@ class WsHub {
         serial_number: client.machineSerial,
         username: client.userName,
         ip_address: client.ip,
+        machineBrand: client.machineBrand,
+        machineModel: client.machineModel,
         appuser_id: client.appuser_id,
         last_seen: new Date()
       },
       update: {
         ip_address: client.ip,
         username: client.userName,
+        machineBrand: client.machineBrand,
+        machineModel: client.machineModel,
         last_seen: new Date()
       }
     });

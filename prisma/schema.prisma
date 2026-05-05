@@ -13,6 +13,8 @@ model computers {
   hostname       String           @unique @db.VarChar(255)
   username       String?          @db.VarChar(255)
   ip_address     String?          @db.VarChar(50)
+  machineBrand   String?          @db.VarChar(255)
+  machineModel   String?          @db.VarChar(255)
   last_seen      DateTime?        @default(now()) @db.DateTime(0)
   created_at     DateTime?        @default(now()) @db.DateTime(0)
   updated_at     DateTime?        @updatedAt @db.DateTime(0)
@@ -117,6 +119,7 @@ model categorization_apps {
 enum category {
   productive
   unproductive
+  ignore
 }
 
 enum state_log_state {

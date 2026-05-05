@@ -28,6 +28,8 @@ export
   machineName: string;
   machineSerial: string;
   userName: string;
+  machineBrand: string;
+  machineModel: string;
   isAlive: boolean;
   ip: string;
   connectedAt: Date;

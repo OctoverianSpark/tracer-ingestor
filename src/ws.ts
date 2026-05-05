@@ -48,6 +48,8 @@ export const startWs = () => {
         machineSerial: payload.machineSerial,
         userName: payload.userName,
         machineName: payload.machineName,
+        machineBrand: payload.machineBrand,
+        machineModel: payload.machineModel,
         ip: payload.ip,
         isAlive: true,
         connectedAt: new Date(),
