@@ -103,7 +103,7 @@ model schedules {
   appuser_id      BigInt?
   programation_id BigInt
   day_of_week     String       @db.VarChar(20)
-  appuser         appuser?     @relation(fields: [appuser_id], references: [id], onDelete: SetNull)
+  appuser         appuser?     @relation(fields: [appuser_id], references: [id], onDelete: Cascade)
   programation    programation @relation(fields: [programation_id], references: [id], onDelete: Cascade)
 
   @@index([appuser_id])
