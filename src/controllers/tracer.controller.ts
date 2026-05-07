@@ -136,23 +136,35 @@ class TracerController extends Controller<ProgramationService> {
     res.status(501).json({ error: "Not implemented" });
   }
 
-  async getUpdateInfo(_req: Request, res: Response) {
+  private resolveInstaller(version?: string): { version: string; filePath: string; filename: string; stat: fs.Stats } | null {
+    const versionFolders = fs.readdirSync(INSTALLERS_DIR)
+      .filter(f => !f.startsWith(".") && fs.statSync(path.join(INSTALLERS_DIR, f)).isDirectory())
+      .sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" }));
+
+    const targets = version ? versionFolders.filter(v => v === version) : versionFolders;
+
+    for (const v of targets) {
+      const files = fs.readdirSync(path.join(INSTALLERS_DIR, v)).filter(f => !f.startsWith("."));
+      if (files.length > 0) {
+        const filename = files[0]!;
+        const filePath = path.join(INSTALLERS_DIR, v, filename);
+        return { version: v, filePath, filename, stat: fs.statSync(filePath) };
+      }
+    }
+    return null;
+  }
+
+  async getUpdateInfo(req: Request, res: Response) {
     try {
-      const files = fs.readdirSync(INSTALLERS_DIR).filter(f => !f.startsWith("."));
-      if (files.length === 0) return res.status(404).json({ error: "No installer available" });
-
-      const latest = files
-        .map(f => ({ name: f, stat: fs.statSync(path.join(INSTALLERS_DIR, f)) }))
-        .sort((a, b) => b.stat.mtime.getTime() - a.stat.mtime.getTime())
-        .at(0);
-
-      if (!latest) return res.status(404).json({ error: "No installer available" });
+      const installer = this.resolveInstaller(req.query.version as string | undefined);
+      if (!installer) return res.status(404).json({ error: "No installer available" });
 
       return res.json({
         ok: true,
-        filename: latest.name,
-        size: latest.stat.size,
-        updatedAt: latest.stat.mtime,
+        version: installer.version,
+        filename: installer.filename,
+        size: installer.stat.size,
+        updatedAt: installer.stat.mtime,
       });
     } catch (err) {
       console.error(err);
@@ -160,19 +172,12 @@ class TracerController extends Controller<ProgramationService> {
     }
   }
 
-  async downloadUpdate(_req: Request, res: Response) {
+  async downloadUpdate(req: Request, res: Response) {
     try {
-      const files = fs.readdirSync(INSTALLERS_DIR).filter(f => !f.startsWith("."));
-      if (files.length === 0) return res.status(404).json({ error: "No installer available" });
+      const installer = this.resolveInstaller(req.query.version as string | undefined);
+      if (!installer) return res.status(404).json({ error: "No installer available" });
 
-      const latest = files
-        .map(f => ({ name: f, mtime: fs.statSync(path.join(INSTALLERS_DIR, f)).mtime }))
-        .sort((a, b) => b.mtime.getTime() - a.mtime.getTime())
-        .at(0);
-
-      if (!latest) return res.status(404).json({ error: "No installer available" });
-
-      return res.download(path.join(INSTALLERS_DIR, latest.name), latest.name);
+      return res.download(installer.filePath, installer.filename);
     } catch (err) {
       console.error(err);
       return res.status(500).json({ error: "Failed to serve installer" });
@@ -181,7 +186,8 @@ class TracerController extends Controller<ProgramationService> {
 
   async uploadUpdate(req: Request, res: Response) {
     if (!req.file) return res.status(400).json({ error: "No file provided" });
-    return res.status(200).json({ ok: true, filename: req.file.filename, size: req.file.size });
+    const version = (req.query.version as string) || "unversioned";
+    return res.status(200).json({ ok: true, version, filename: req.file.filename, size: req.file.size });
   }
 }
 

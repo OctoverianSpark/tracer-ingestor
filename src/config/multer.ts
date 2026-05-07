@@ -15,7 +15,12 @@ if (!fs.existsSync(INSTALLERS_DIR)) {
 
 export const uploadInstaller = multer({
   storage: multer.diskStorage({
-    destination: INSTALLERS_DIR,
+    destination: (req, _file, cb) => {
+      const version = (req.query.version as string) || "unversioned";
+      const dir = path.join(INSTALLERS_DIR, version);
+      fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
     filename: (_req, file, cb) => cb(null, file.originalname),
   }),
   limits: { fileSize: 512 * 1024 * 1024 },
