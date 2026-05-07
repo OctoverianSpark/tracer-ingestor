@@ -8,6 +8,19 @@ import type { Request, Response } from "express";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SCREENSHOTS_DIR = path.join(process.env.SCREENSHOTS_PATH || path.join(__dirname, "../screenshots"));
 
+export const INSTALLERS_DIR = path.join(process.env.INSTALLERS_PATH || path.join(__dirname, "../installers"));
+if (!fs.existsSync(INSTALLERS_DIR)) {
+  fs.mkdirSync(INSTALLERS_DIR, { recursive: true });
+}
+
+export const uploadInstaller = multer({
+  storage: multer.diskStorage({
+    destination: INSTALLERS_DIR,
+    filename: (_req, file, cb) => cb(null, file.originalname),
+  }),
+  limits: { fileSize: 512 * 1024 * 1024 },
+});
+
 if (!fs.existsSync(SCREENSHOTS_DIR)) {
   fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
 }
