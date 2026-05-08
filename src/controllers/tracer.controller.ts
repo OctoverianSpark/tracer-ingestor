@@ -137,9 +137,13 @@ class TracerController extends Controller<ProgramationService> {
   }
 
   private resolveInstaller(version?: string): { version: string; filePath: string; filename: string; stat: fs.Stats } | null {
+    console.log(`[updates] resolveInstaller — buscando en: ${INSTALLERS_DIR}${version ? ` | versión solicitada: ${version}` : " | versión más reciente"}`);
+
     const versionFolders = fs.readdirSync(INSTALLERS_DIR)
       .filter(f => !f.startsWith(".") && fs.statSync(path.join(INSTALLERS_DIR, f)).isDirectory())
       .sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" }));
+
+    console.log(`[updates] carpetas de versiones disponibles: [${versionFolders.join(", ") || "ninguna"}]`);
 
     const targets = version ? versionFolders.filter(v => v === version) : versionFolders;
 
@@ -148,17 +152,24 @@ class TracerController extends Controller<ProgramationService> {
       if (files.length > 0) {
         const filename = files[0]!;
         const filePath = path.join(INSTALLERS_DIR, v, filename);
-        return { version: v, filePath, filename, stat: fs.statSync(filePath) };
+        const stat = fs.statSync(filePath);
+        console.log(`[updates] instalador encontrado — versión: ${v} | archivo: ${filename} | tamaño: ${stat.size} bytes | modificado: ${stat.mtime.toISOString()}`);
+        return { version: v, filePath, filename, stat };
       }
     }
+
+    console.warn(`[updates] no se encontró instalador${version ? ` para la versión "${version}"` : ""}`);
     return null;
   }
 
   async getUpdateInfo(req: Request, res: Response) {
+    const requestedVersion = req.query.version as string | undefined;
+    console.log(`[updates] GET /updates — consulta de info${requestedVersion ? ` | versión: ${requestedVersion}` : " | sin versión especificada (más reciente)"} | ip: ${req.ip}`);
     try {
-      const installer = this.resolveInstaller(req.query.version as string | undefined);
+      const installer = this.resolveInstaller(requestedVersion);
       if (!installer) return res.status(404).json({ error: "No installer available" });
 
+      console.log(`[updates] respondiendo info: versión=${installer.version} | archivo=${installer.filename} | tamaño=${installer.stat.size}`);
       return res.json({
         ok: true,
         version: installer.version,
@@ -167,26 +178,35 @@ class TracerController extends Controller<ProgramationService> {
         updatedAt: installer.stat.mtime,
       });
     } catch (err) {
-      console.error(err);
+      console.error("[updates] error al leer info del instalador:", err);
       return res.status(500).json({ error: "Failed to read installer info" });
     }
   }
 
   async downloadUpdate(req: Request, res: Response) {
+    const requestedVersion = req.query.version as string | undefined;
+    console.log(`[updates] GET /updates/download — solicitud de descarga${requestedVersion ? ` | versión: ${requestedVersion}` : " | versión más reciente"} | ip: ${req.ip}`);
     try {
-      const installer = this.resolveInstaller(req.query.version as string | undefined);
+      const installer = this.resolveInstaller(requestedVersion);
       if (!installer) return res.status(404).json({ error: "No installer available" });
 
+      console.log(`[updates] iniciando envío de archivo: ${installer.filename} (${installer.stat.size} bytes) desde ${installer.filePath}`);
+      res.on("finish", () => console.log(`[updates] descarga completada: ${installer.filename} → ip: ${req.ip}`));
       return res.download(installer.filePath, installer.filename);
     } catch (err) {
-      console.error(err);
+      console.error("[updates] error al servir instalador:", err);
       return res.status(500).json({ error: "Failed to serve installer" });
     }
   }
 
   async uploadUpdate(req: Request, res: Response) {
-    if (!req.file) return res.status(400).json({ error: "No file provided" });
     const version = (req.query.version as string) || "unversioned";
+    console.log(`[updates] POST /updates — subida de instalador | versión: ${version} | ip: ${req.ip}`);
+    if (!req.file) {
+      console.warn("[updates] subida rechazada: no se recibió archivo");
+      return res.status(400).json({ error: "No file provided" });
+    }
+    console.log(`[updates] archivo recibido: ${req.file.filename} | tamaño: ${req.file.size} bytes | destino: ${req.file.path}`);
     return res.status(200).json({ ok: true, version, filename: req.file.filename, size: req.file.size });
   }
 }
