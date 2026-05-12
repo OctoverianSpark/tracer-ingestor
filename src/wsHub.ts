@@ -47,26 +47,48 @@ class WsHub {
   async addClient(client: ClientConnection, ws: WebSocket) {
     const existing = this.findClient(client.machineSerial);
 
-    await prisma.computers.upsert({
-      where: { hostname: client.machineName },
-      create: {
-        hostname: client.machineName,
-        serial_number: client.machineSerial,
-        username: client.userName,
-        ip_address: client.ip,
-        machineBrand: client.machineBrand,
-        machineModel: client.machineModel,
-        appuser_id: client.appuser_id,
-        last_seen: new Date()
-      },
-      update: {
-        ip_address: client.ip,
-        username: client.userName,
-        machineBrand: client.machineBrand,
-        machineModel: client.machineModel,
-        last_seen: new Date()
-      }
+    const bySerial = await prisma.computers.findFirst({
+      where: { serial_number: client.machineSerial }
     });
+
+    if (bySerial) {
+      await prisma.computers.update({
+        where: { id: bySerial.id },
+        data: {
+          hostname: client.machineName,
+          serial_number: client.machineSerial,
+          ip_address: client.ip,
+          username: client.userName,
+          machineBrand: client.machineBrand,
+          machineModel: client.machineModel,
+          appuser_id: client.appuser_id,
+          last_seen: new Date()
+        }
+      });
+    } else {
+      await prisma.computers.upsert({
+        where: { hostname: client.machineName },
+        create: {
+          hostname: client.machineName,
+          serial_number: client.machineSerial,
+          username: client.userName,
+          ip_address: client.ip,
+          machineBrand: client.machineBrand,
+          machineModel: client.machineModel,
+          appuser_id: client.appuser_id,
+          last_seen: new Date()
+        },
+        update: {
+          serial_number: client.machineSerial,
+          ip_address: client.ip,
+          username: client.userName,
+          machineBrand: client.machineBrand,
+          machineModel: client.machineModel,
+          appuser_id: client.appuser_id,
+          last_seen: new Date()
+        }
+      });
+    }
 
     console.log(`🟢 ${client.machineName} ${existing ? "re-connected" : "connected"}`);
     this.clients.set(client.machineSerial, { ...client, ws, isAlive: true, connectedAt: new Date() });
