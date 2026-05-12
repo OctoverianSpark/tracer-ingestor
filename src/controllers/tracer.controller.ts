@@ -9,11 +9,12 @@ import { INSTALLERS_DIR } from "../config/multer.js";
 
 const stateMap: Record<number, state_log_state> = {
   0: "working",
-  1: "break",
-  2: "wc",
-  3: "lunch",
-  4: "idle",
-  5: "offline"
+  1: "overtime",
+  2: "break",
+  3: "wc",
+  4: "lunch",
+  5: "idle",
+  6: "offline"
 };
 
 const categoryMap: Record<number, state_log_category> = {

@@ -126,6 +126,7 @@ enum category {
 
 enum state_log_state {
   working
+  overtime
   break
   wc
   lunch
