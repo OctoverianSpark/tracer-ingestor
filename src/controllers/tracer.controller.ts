@@ -51,12 +51,16 @@ class TracerController extends Controller<ProgramationService> {
         Timestamp: string;
       }[];
 
+      console.log("[states] body recibido:", JSON.stringify(req.body));
+
       const workerId = payload[0]?.WorkerId;
+      console.log("[states] workerId extraído:", workerId);
       if (!workerId) return res.status(400).json({ error: "No WorkerId" });
 
       const computer = await prisma.computers.findFirst({
         where: { hostname: workerId }
       });
+      console.log("[states] computer encontrado:", computer ? `id=${computer.id} hostname=${computer.hostname}` : "null");
       if (!computer) return res.status(404).json({ error: "Computer not found" });
 
       const rows = payload.map(log => {
@@ -67,11 +71,12 @@ class TracerController extends Controller<ProgramationService> {
         return { computer_id: computer.id, user_name: log.WorkerUserName, state, category, type, timestamp: new Date(log.Timestamp) };
       });
 
+      console.log("[states] insertando", rows.length, "registros");
       await prisma.state_logs.createMany({ data: rows });
 
       res.json({ ok: true, count: payload.length });
     } catch (err) {
-      console.error(err);
+      console.error("[states] error:", err);
       res.status(500).json({ error: "Failed to sync states" });
     }
   }
