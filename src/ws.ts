@@ -43,7 +43,7 @@ export const startWs = () => {
 
 
 
-      wsHub.addClient({
+      await wsHub.addClient({
         ws: ws,
         machineSerial: payload.machineSerial,
         userName: payload.userName,

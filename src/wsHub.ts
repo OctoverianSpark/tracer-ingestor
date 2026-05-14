@@ -5,6 +5,7 @@ import prisma from "./lib/prisma.js";
 
 class WsHub {
   private clients = new Map<string, ClientConnection>();
+  private connectionQueues = new Map<string, Promise<void>>();
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 
   async initialize() {
@@ -44,53 +45,46 @@ class WsHub {
     return this.clients.get(machineSerial);
   }
 
-  async addClient(client: ClientConnection, ws: WebSocket) {
+  addClient(client: ClientConnection, ws: WebSocket): Promise<void> {
+    const pending = this.connectionQueues.get(client.machineSerial) ?? Promise.resolve();
+    const task = pending.catch(() => {}).then(() => this._processConnection(client, ws));
+    this.connectionQueues.set(client.machineSerial, task.catch(() => {}));
+    return task;
+  }
+
+  private async _processConnection(client: ClientConnection, ws: WebSocket) {
     const existing = this.findClient(client.machineSerial);
 
-    const bySerial = await prisma.computers.findFirst({
-      where: { serial_number: client.machineSerial }
+    await prisma.computers.upsert({
+      where: { serial_number: client.machineSerial },
+      create: {
+        hostname: client.machineName,
+        serial_number: client.machineSerial,
+        username: client.userName,
+        ip_address: client.ip,
+        machineBrand: client.machineBrand,
+        machineModel: client.machineModel,
+        appuser_id: client.appuser_id,
+        last_seen: new Date()
+      },
+      update: {
+        hostname: client.machineName,
+        ip_address: client.ip,
+        username: client.userName,
+        machineBrand: client.machineBrand,
+        machineModel: client.machineModel,
+        appuser_id: client.appuser_id,
+        last_seen: new Date()
+      }
     });
 
-    if (bySerial) {
-      await prisma.computers.update({
-        where: { id: bySerial.id },
-        data: {
-          hostname: client.machineName,
-          serial_number: client.machineSerial,
-          ip_address: client.ip,
-          username: client.userName,
-          machineBrand: client.machineBrand,
-          machineModel: client.machineModel,
-          appuser_id: client.appuser_id,
-          last_seen: new Date()
-        }
-      });
-    } else {
-      await prisma.computers.upsert({
-        where: { hostname: client.machineName },
-        create: {
-          hostname: client.machineName,
-          serial_number: client.machineSerial,
-          username: client.userName,
-          ip_address: client.ip,
-          machineBrand: client.machineBrand,
-          machineModel: client.machineModel,
-          appuser_id: client.appuser_id,
-          last_seen: new Date()
-        },
-        update: {
-          serial_number: client.machineSerial,
-          ip_address: client.ip,
-          username: client.userName,
-          machineBrand: client.machineBrand,
-          machineModel: client.machineModel,
-          appuser_id: client.appuser_id,
-          last_seen: new Date()
-        }
-      });
+    // Si el mismo serial ya tiene una conexión activa más reciente, cerrar la anterior
+    const current = this.clients.get(client.machineSerial);
+    if (current?.ws && current.ws !== ws && current.ws.readyState === WebSocket.OPEN) {
+      current.ws.close(1000, "Replaced by newer connection");
     }
 
-    console.log(`🟢 ${client.machineName} ${existing ? "re-connected" : "connected"}`);
+    console.log(`🟢 ${client.machineName} ${existing?.ws ? "re-connected" : "connected"}`);
     this.clients.set(client.machineSerial, { ...client, ws, isAlive: true, connectedAt: new Date() });
   }
 
