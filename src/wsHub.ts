@@ -105,9 +105,10 @@ class WsHub {
     console.log(`🔴 ${client.machineName} disconnected`);
   }
 
-  shutdownClient(machineSerial: string) {
+  shutdownClient(machineSerial: string, ws?: WebSocket) {
     const client = this.clients.get(machineSerial);
     if (!client) return;
+    if (ws && client.ws !== ws) return;
 
     client.ws = null as unknown as WebSocket;
     client.isAlive = false;

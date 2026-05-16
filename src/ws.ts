@@ -64,7 +64,7 @@ export const startWs = () => {
       });
 
       ws.on("close", () => {
-        wsHub.shutdownClient(payload.machineSerial);
+        wsHub.shutdownClient(payload.machineSerial, ws);
       });
 
       ws.on("message", data => {
