@@ -8,11 +8,20 @@ class ScheduleService extends Service<schedules, Prisma.schedulesCreateInput, Pr
 
   async saveMany(data: Prisma.schedulesCreateManyInput[]): Promise<schedules[]> {
     try {
-      const createdSchedules = await this.model.createMany({
-        data,
-        skipDuplicates: true,
-      });
-      return createdSchedules as unknown as schedules[];
+      return await prisma.$transaction(
+        data.map(item =>
+          this.model.upsert({
+            where: {
+              appuser_id_day_of_week: {
+                appuser_id: item.appuser_id as bigint,
+                day_of_week: item.day_of_week as string,
+              },
+            },
+            update: { programation_id: item.programation_id as bigint },
+            create: item as Prisma.schedulesUncheckedCreateInput,
+          })
+        )
+      );
     } catch (error) {
       throw new Error(`Error saving schedules: ${error}`);
     }
