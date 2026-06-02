@@ -47,36 +47,67 @@ class WsHub {
 
   addClient(client: ClientConnection, ws: WebSocket): Promise<void> {
     const pending = this.connectionQueues.get(client.machineSerial) ?? Promise.resolve();
-    const task = pending.catch(() => {}).then(() => this._processConnection(client, ws));
-    this.connectionQueues.set(client.machineSerial, task.catch(() => {}));
+    const task = pending.catch(() => { }).then(() => this._processConnection(client, ws));
+    this.connectionQueues.set(client.machineSerial, task.catch(() => { }));
     return task;
   }
 
   private async _processConnection(client: ClientConnection, ws: WebSocket) {
     const existing = this.findClient(client.machineSerial);
 
-    await prisma.computers.upsert({
-      where: { serial_number: client.machineSerial },
-      create: {
-        hostname: client.machineName,
-        serial_number: client.machineSerial,
-        username: client.userName,
-        ip_address: client.ip,
-        machineBrand: client.machineBrand,
-        machineModel: client.machineModel,
-        appuser_id: client.appuser_id,
-        last_seen: new Date()
-      },
-      update: {
-        hostname: client.machineName,
-        ip_address: client.ip,
-        username: client.userName,
-        machineBrand: client.machineBrand,
-        machineModel: client.machineModel,
-        appuser_id: client.appuser_id,
-        last_seen: new Date()
+    try {
+      await prisma.computers.upsert({
+        where: { serial_number: client.machineSerial },
+        create: {
+          hostname: client.machineName,
+          serial_number: client.machineSerial,
+          username: client.userName,
+          ip_address: client.ip,
+          machineBrand: client.machineBrand,
+          machineModel: client.machineModel,
+          appuser_id: client.appuser_id,
+          last_seen: new Date()
+        },
+        update: {
+          hostname: client.machineName,
+          ip_address: client.ip,
+          username: client.userName,
+          machineBrand: client.machineBrand,
+          machineModel: client.machineModel,
+          appuser_id: client.appuser_id,
+          last_seen: new Date()
+        }
+      });
+    } catch (err: any) {
+      // Handle unique constraint violations on hostname: another record exists with same hostname
+      if (err?.code === "P2002" && err?.meta?.target && String(err.meta.target).includes("hostname")) {
+        try {
+          const existingByHost = await prisma.computers.findUnique({ where: { hostname: client.machineName } as any });
+          if (existingByHost) {
+            await prisma.computers.update({
+              where: { id: existingByHost.id } as any,
+              data: {
+                serial_number: client.machineSerial,
+                ip_address: client.ip,
+                username: client.userName,
+                machineBrand: client.machineBrand,
+                machineModel: client.machineModel,
+                appuser_id: client.appuser_id,
+                last_seen: new Date()
+              }
+            });
+          } else {
+            // rethrow if we cannot resolve
+            throw err;
+          }
+        } catch (innerErr) {
+          console.error("[wsHub] Failed to resolve hostname unique conflict:", innerErr);
+          throw innerErr;
+        }
+      } else {
+        throw err;
       }
-    });
+    }
 
     // Si el mismo serial ya tiene una conexión activa más reciente, cerrar la anterior
     const current = this.clients.get(client.machineSerial);
