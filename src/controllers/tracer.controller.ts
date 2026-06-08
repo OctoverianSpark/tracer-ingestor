@@ -155,23 +155,44 @@ class TracerController extends Controller<ProgramationService> {
   private resolveInstaller(version?: string): { version: string; filePath: string; filename: string; stat: fs.Stats } | null {
     console.log(`[updates] resolveInstaller — buscando en: ${INSTALLERS_DIR}${version ? ` | versión solicitada: ${version}` : " | versión más reciente"}`);
 
-    const versionFolders = fs.readdirSync(INSTALLERS_DIR)
-      .filter(f => !f.startsWith(".") && fs.statSync(path.join(INSTALLERS_DIR, f)).isDirectory())
-      .sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" }));
+    const entries = fs.readdirSync(INSTALLERS_DIR).filter((f: string) => !f.startsWith("."));
 
-    console.log(`[updates] carpetas de versiones disponibles: [${versionFolders.join(", ") || "ninguna"}]`);
+    // Archivos directamente en installers/ — extrae versión del nombre (ej: ActiMetrics-1.10.0-full.nupkg)
+    type FlatEntry = { version: string; filename: string; filePath: string; stat: fs.Stats };
+    const flatFiles: FlatEntry[] = entries
+      .filter((f: string) => fs.statSync(path.join(INSTALLERS_DIR, f)).isFile())
+      .flatMap((f: string) => {
+        const match = f.match(/(\d+\.\d+(?:\.\d+)*)/);
+        if (!match) return [];
+        return [{ version: match[1]!, filename: f, filePath: path.join(INSTALLERS_DIR, f), stat: fs.statSync(path.join(INSTALLERS_DIR, f)) }];
+      })
+      .sort((a: FlatEntry, b: FlatEntry) => b.version.localeCompare(a.version, undefined, { numeric: true, sensitivity: "base" }));
 
-    const targets = version ? versionFolders.filter(v => v === version) : versionFolders;
+    // Subcarpetas de versión (ej: installers/1.10.0/ActiMetrics-1.10.0-full.nupkg)
+    const versionFolders = entries
+      .filter((f: string) => fs.statSync(path.join(INSTALLERS_DIR, f)).isDirectory())
+      .sort((a: string, b: string) => b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" }));
 
-    for (const v of targets) {
-      const files = fs.readdirSync(path.join(INSTALLERS_DIR, v)).filter(f => !f.startsWith("."));
+    console.log(`[updates] carpetas: [${versionFolders.join(", ") || "ninguna"}] | archivos planos: [${flatFiles.map((f: FlatEntry) => f.filename).join(", ") || "ninguno"}]`);
+
+    // Busca primero en subcarpetas, luego en archivos planos
+    const folderTargets = version ? versionFolders.filter((v: string) => v === version) : versionFolders;
+    for (const v of folderTargets) {
+      const files = fs.readdirSync(path.join(INSTALLERS_DIR, v)).filter((f: string) => !f.startsWith("."));
       if (files.length > 0) {
         const filename = files[0]!;
         const filePath = path.join(INSTALLERS_DIR, v, filename);
         const stat = fs.statSync(filePath);
-        console.log(`[updates] instalador encontrado — versión: ${v} | archivo: ${filename} | tamaño: ${stat.size} bytes | modificado: ${stat.mtime.toISOString()}`);
+        console.log(`[updates] instalador encontrado (carpeta) — versión: ${v} | archivo: ${filename}`);
         return { version: v, filePath, filename, stat };
       }
+    }
+
+    const flatTargets = version ? flatFiles.filter((f: FlatEntry) => f.version === version) : flatFiles;
+    if (flatTargets.length > 0) {
+      const f = flatTargets[0]!;
+      console.log(`[updates] instalador encontrado (plano) — versión: ${f.version} | archivo: ${f.filename}`);
+      return f;
     }
 
     console.warn(`[updates] no se encontró instalador${version ? ` para la versión "${version}"` : ""}`);
@@ -216,24 +237,27 @@ class TracerController extends Controller<ProgramationService> {
   }
 
   async getReleaseManifest(req: Request, res: Response) {
-    const { localVersion, rid } = req.query as Record<string, string>;
-    console.log(`[updates] GET /updates/releases.win.json — rid: ${rid} | localVersion: ${localVersion} | ip: ${req.ip}`);
+    const { id, rid } = req.query as Record<string, string>;
+    console.log(`[updates] GET /updates/releases.win.json — id: ${id} | rid: ${rid} | ip: ${req.ip}`);
     try {
       const installer = this.resolveInstaller();
-      if (!installer) return res.status(404).json({ error: "No installer available" });
-
-      if (localVersion && !isNewerVersion(installer.version, localVersion)) {
-        console.log(`[updates] cliente actualizado — local: ${localVersion} | disponible: ${installer.version}`);
-        return res.json({ ok: true, upToDate: true });
+      if (!installer) {
+        console.log("[updates] sin instaladores — devolviendo Assets vacío");
+        return res.json({ Assets: [] });
       }
 
-      console.log(`[updates] nueva versión disponible: ${installer.version} | archivo: ${installer.filename}`);
+      const packageId = id ?? installer.filename.split("-")[0] ?? "App";
+      console.log(`[updates] manifest Velopack — PackageId: ${packageId} | Version: ${installer.version} | FileName: ${installer.filename}`);
       return res.json({
-        ok: true,
-        version: installer.version,
-        filename: installer.filename,
-        size: installer.stat.size,
-        updatedAt: installer.stat.mtime,
+        Assets: [
+          {
+            PackageId: packageId,
+            Version: installer.version,
+            Type: "Full",
+            FileName: installer.filename,
+            Size: installer.stat.size,
+          }
+        ]
       });
     } catch (err) {
       console.error("[updates] error en getReleaseManifest:", err);
