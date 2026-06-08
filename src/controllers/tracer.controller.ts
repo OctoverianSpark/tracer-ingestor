@@ -37,7 +37,7 @@ function computeSha256(filePath: string): string {
 
 function getSha256(filePath: string): string {
   const sidecar = `${filePath}.sha256`;
-  if (fs.existsSync(sidecar)) return fs.readFileSync(sidecar, "utf8").trim();
+  if (fs.existsSync(sidecar)) return fs.readFileSync(sidecar, "utf8").trim().toUpperCase();
   const sha256 = computeSha256(filePath);
   fs.writeFileSync(sidecar, sha256, "utf8");
   return sha256;
