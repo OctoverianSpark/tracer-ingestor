@@ -32,7 +32,7 @@ const typeMap: Record<number, state_log_type> = {
 function computeSha256(filePath: string): string {
   const hash = crypto.createHash("sha256");
   hash.update(fs.readFileSync(filePath));
-  return hash.digest("hex");
+  return hash.digest("hex").toUpperCase();
 }
 
 function getSha256(filePath: string): string {
