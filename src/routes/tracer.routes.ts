@@ -1,5 +1,5 @@
 import { Router } from "express"
-import { getStateLogs, syncStates, syncAppUsage, getUpdateInfo, downloadUpdate, uploadUpdate } from "../controllers/tracer.controller.js"
+import { getStateLogs, syncStates, syncAppUsage, getUpdateInfo, downloadUpdate, uploadUpdate, getReleaseManifest } from "../controllers/tracer.controller.js"
 import { saveScreenShot, upload, uploadInstaller } from "../config/multer.js"
 
 const tracerRoutes = Router()
@@ -9,6 +9,7 @@ tracerRoutes.post("/screenshot", upload.single("file"), saveScreenShot)
 tracerRoutes.get("/get-state-logs", getStateLogs)
 
 tracerRoutes.get("/updates", getUpdateInfo)
+tracerRoutes.get("/updates/releases.win.json", getReleaseManifest)
 tracerRoutes.get("/updates/download", downloadUpdate)
 tracerRoutes.post("/updates", uploadInstaller.single("file"), uploadUpdate)
 

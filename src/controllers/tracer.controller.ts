@@ -28,6 +28,16 @@ const typeMap: Record<number, state_log_type> = {
   1: "manual"
 };
 
+function isNewerVersion(available: string, current: string): boolean {
+  const parse = (v: string) => v.split(".").map(Number);
+  const [a, b] = [parse(available), parse(current)];
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const diff = (a[i] ?? 0) - (b[i] ?? 0);
+    if (diff !== 0) return diff > 0;
+  }
+  return false;
+}
+
 class TracerController extends Controller<ProgramationService> {
   protected service = programationService;
 
@@ -205,6 +215,36 @@ class TracerController extends Controller<ProgramationService> {
     }
   }
 
+  async getReleaseManifest(req: Request, res: Response) {
+    const { rid, localVersion } = req.query as Record<string, string>;
+    console.log(`[updates] GET /updates/releases.win.json — rid: ${rid} | localVersion: ${localVersion} | ip: ${req.ip}`);
+    try {
+      const installer = this.resolveInstaller();
+      if (!installer) return res.status(404).json({ error: "No installer available" });
+
+      if (localVersion && !isNewerVersion(installer.version, localVersion)) {
+        console.log(`[updates] cliente actualizado — versión local: ${localVersion} | disponible: ${installer.version}`);
+        return res.status(204).send();
+      }
+
+      const protocol = (req.headers["x-forwarded-proto"] as string) ?? req.protocol;
+      const host = (req.headers["x-forwarded-host"] as string) ?? req.get("host");
+      const downloadUrl = `${protocol}://${host}/tracer/updates/download?version=${installer.version}${rid ? `&rid=${encodeURIComponent(rid)}` : ""}`;
+
+      console.log(`[updates] nueva versión disponible: ${installer.version} | url: ${downloadUrl}`);
+      return res.json({
+        version: installer.version,
+        url: downloadUrl,
+        filename: installer.filename,
+        size: installer.stat.size,
+        releaseDate: installer.stat.mtime,
+      });
+    } catch (err) {
+      console.error("[updates] error en getReleaseManifest:", err);
+      return res.status(500).json({ error: "Failed to read release manifest" });
+    }
+  }
+
   async uploadUpdate(req: Request, res: Response) {
     const version = (req.query.version as string) || "unversioned";
     console.log(`[updates] POST /updates — subida de instalador | versión: ${version} | ip: ${req.ip}`);
@@ -218,5 +258,5 @@ class TracerController extends Controller<ProgramationService> {
 }
 
 const tracerController = new TracerController();
-export const { getStateLogs, syncStates, syncAppUsage, pingData, ProgramationSave, GetProgramations, GetSchedules, SchedulePersonal, getUpdateInfo, downloadUpdate, uploadUpdate } = tracerController;
+export const { getStateLogs, syncStates, syncAppUsage, pingData, ProgramationSave, GetProgramations, GetSchedules, SchedulePersonal, getUpdateInfo, downloadUpdate, uploadUpdate, getReleaseManifest } = tracerController;
 export default tracerController;
