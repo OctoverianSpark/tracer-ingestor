@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { state_log_category, state_log_state, state_log_type, programation } from "@prisma/client";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import prisma from "../lib/prisma.js";
 import Controller from "./controller.js";
 import programationService, { type ProgramationService } from "../services/schedules/programation.service.js";
@@ -27,6 +28,20 @@ const typeMap: Record<number, state_log_type> = {
   0: "auto",
   1: "manual"
 };
+
+function computeSha256(filePath: string): string {
+  const hash = crypto.createHash("sha256");
+  hash.update(fs.readFileSync(filePath));
+  return hash.digest("hex");
+}
+
+function getSha256(filePath: string): string {
+  const sidecar = `${filePath}.sha256`;
+  if (fs.existsSync(sidecar)) return fs.readFileSync(sidecar, "utf8").trim();
+  const sha256 = computeSha256(filePath);
+  fs.writeFileSync(sidecar, sha256, "utf8");
+  return sha256;
+}
 
 function isNewerVersion(available: string, current: string): boolean {
   const parse = (v: string) => v.split(".").map(Number);
@@ -152,19 +167,20 @@ class TracerController extends Controller<ProgramationService> {
     res.status(501).json({ error: "Not implemented" });
   }
 
-  private resolveInstaller(version?: string): { version: string; filePath: string; filename: string; stat: fs.Stats } | null {
+  private resolveInstaller(version?: string): { version: string; filePath: string; filename: string; stat: fs.Stats; sha256: string } | null {
     console.log(`[updates] resolveInstaller — buscando en: ${INSTALLERS_DIR}${version ? ` | versión solicitada: ${version}` : " | versión más reciente"}`);
 
     const entries = fs.readdirSync(INSTALLERS_DIR).filter((f: string) => !f.startsWith("."));
 
     // Archivos directamente en installers/ — extrae versión del nombre (ej: ActiMetrics-1.10.0-full.nupkg)
-    type FlatEntry = { version: string; filename: string; filePath: string; stat: fs.Stats };
+    type FlatEntry = { version: string; filename: string; filePath: string; stat: fs.Stats; sha256: string };
     const flatFiles: FlatEntry[] = entries
-      .filter((f: string) => fs.statSync(path.join(INSTALLERS_DIR, f)).isFile())
+      .filter((f: string) => fs.statSync(path.join(INSTALLERS_DIR, f)).isFile() && !f.endsWith(".sha256"))
       .flatMap((f: string) => {
         const match = f.match(/(\d+\.\d+(?:\.\d+)*)/);
         if (!match) return [];
-        return [{ version: match[1]!, filename: f, filePath: path.join(INSTALLERS_DIR, f), stat: fs.statSync(path.join(INSTALLERS_DIR, f)) }];
+        const filePath = path.join(INSTALLERS_DIR, f);
+        return [{ version: match[1]!, filename: f, filePath, stat: fs.statSync(filePath), sha256: getSha256(filePath) }];
       })
       .sort((a: FlatEntry, b: FlatEntry) => b.version.localeCompare(a.version, undefined, { numeric: true, sensitivity: "base" }));
 
@@ -183,8 +199,9 @@ class TracerController extends Controller<ProgramationService> {
         const filename = files[0]!;
         const filePath = path.join(INSTALLERS_DIR, v, filename);
         const stat = fs.statSync(filePath);
-        console.log(`[updates] instalador encontrado (carpeta) — versión: ${v} | archivo: ${filename}`);
-        return { version: v, filePath, filename, stat };
+        const sha256 = getSha256(filePath);
+        console.log(`[updates] instalador encontrado (carpeta) — versión: ${v} | archivo: ${filename} | sha256: ${sha256.slice(0, 8)}...`);
+        return { version: v, filePath, filename, stat, sha256 };
       }
     }
 
@@ -247,7 +264,7 @@ class TracerController extends Controller<ProgramationService> {
       }
 
       const packageId = id ?? installer.filename.split("-")[0] ?? "App";
-      console.log(`[updates] manifest Velopack — PackageId: ${packageId} | Version: ${installer.version} | FileName: ${installer.filename}`);
+      console.log(`[updates] manifest Velopack — PackageId: ${packageId} | Version: ${installer.version} | FileName: ${installer.filename} | SHA256: ${installer.sha256.slice(0, 8)}...`);
       return res.json({
         Assets: [
           {
@@ -255,6 +272,7 @@ class TracerController extends Controller<ProgramationService> {
             Version: installer.version,
             Type: "Full",
             FileName: installer.filename,
+            SHA256: installer.sha256,
             Size: installer.stat.size,
           }
         ]
@@ -296,8 +314,9 @@ class TracerController extends Controller<ProgramationService> {
       console.warn("[updates] subida rechazada: no se recibió archivo");
       return res.status(400).json({ error: "No file provided" });
     }
-    console.log(`[updates] archivo recibido: ${req.file.filename} | tamaño: ${req.file.size} bytes | destino: ${req.file.path}`);
-    return res.status(200).json({ ok: true, version, filename: req.file.filename, size: req.file.size });
+    const sha256 = getSha256(req.file.path);
+    console.log(`[updates] archivo recibido: ${req.file.filename} | tamaño: ${req.file.size} bytes | sha256: ${sha256} | destino: ${req.file.path}`);
+    return res.status(200).json({ ok: true, version, filename: req.file.filename, size: req.file.size, sha256 });
   }
 }
 
