@@ -216,32 +216,52 @@ class TracerController extends Controller<ProgramationService> {
   }
 
   async getReleaseManifest(req: Request, res: Response) {
-    const { rid, localVersion } = req.query as Record<string, string>;
+    const { localVersion, rid } = req.query as Record<string, string>;
     console.log(`[updates] GET /updates/releases.win.json — rid: ${rid} | localVersion: ${localVersion} | ip: ${req.ip}`);
     try {
       const installer = this.resolveInstaller();
       if (!installer) return res.status(404).json({ error: "No installer available" });
 
       if (localVersion && !isNewerVersion(installer.version, localVersion)) {
-        console.log(`[updates] cliente actualizado — versión local: ${localVersion} | disponible: ${installer.version}`);
-        return res.status(204).send();
+        console.log(`[updates] cliente actualizado — local: ${localVersion} | disponible: ${installer.version}`);
+        return res.json({ ok: true, upToDate: true });
       }
 
-      const protocol = (req.headers["x-forwarded-proto"] as string) ?? req.protocol;
-      const host = (req.headers["x-forwarded-host"] as string) ?? req.get("host");
-      const downloadUrl = `${protocol}://${host}/tracer/updates/download?version=${installer.version}${rid ? `&rid=${encodeURIComponent(rid)}` : ""}`;
-
-      console.log(`[updates] nueva versión disponible: ${installer.version} | url: ${downloadUrl}`);
+      console.log(`[updates] nueva versión disponible: ${installer.version} | archivo: ${installer.filename}`);
       return res.json({
+        ok: true,
         version: installer.version,
-        url: downloadUrl,
         filename: installer.filename,
         size: installer.stat.size,
-        releaseDate: installer.stat.mtime,
+        updatedAt: installer.stat.mtime,
       });
     } catch (err) {
       console.error("[updates] error en getReleaseManifest:", err);
       return res.status(500).json({ error: "Failed to read release manifest" });
+    }
+  }
+
+  async downloadPackage(req: Request, res: Response) {
+    const { filename } = req.params as { filename: string };
+    console.log(`[updates] GET /updates/${filename} — descarga de paquete | ip: ${req.ip}`);
+    try {
+      const versionFolders = fs.readdirSync(INSTALLERS_DIR)
+        .filter((f: string) => !f.startsWith(".") && fs.statSync(path.join(INSTALLERS_DIR, f)).isDirectory());
+
+      for (const v of versionFolders) {
+        const filePath = path.join(INSTALLERS_DIR, v, filename);
+        if (fs.existsSync(filePath)) {
+          console.log(`[updates] sirviendo paquete: ${filename} | versión: ${v}`);
+          res.on("finish", () => console.log(`[updates] descarga completada: ${filename} → ip: ${req.ip}`));
+          return res.download(filePath, filename);
+        }
+      }
+
+      console.warn(`[updates] paquete no encontrado: ${filename}`);
+      return res.status(404).json({ error: "Package not found" });
+    } catch (err) {
+      console.error("[updates] error al servir paquete:", err);
+      return res.status(500).json({ error: "Failed to serve package" });
     }
   }
 
@@ -258,5 +278,5 @@ class TracerController extends Controller<ProgramationService> {
 }
 
 const tracerController = new TracerController();
-export const { getStateLogs, syncStates, syncAppUsage, pingData, ProgramationSave, GetProgramations, GetSchedules, SchedulePersonal, getUpdateInfo, downloadUpdate, uploadUpdate, getReleaseManifest } = tracerController;
+export const { getStateLogs, syncStates, syncAppUsage, pingData, ProgramationSave, GetProgramations, GetSchedules, SchedulePersonal, getUpdateInfo, downloadUpdate, uploadUpdate, getReleaseManifest, downloadPackage } = tracerController;
 export default tracerController;
