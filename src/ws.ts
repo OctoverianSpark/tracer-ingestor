@@ -43,6 +43,11 @@ export const startWs = () => {
 
 
 
+      const detectedIp =
+        (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim()
+        ?? req.socket.remoteAddress
+        ?? payload.ip;
+
       await wsHub.addClient({
         ws: ws,
         machineSerial: payload.machineSerial,
@@ -50,7 +55,7 @@ export const startWs = () => {
         machineName: payload.machineName,
         machineBrand: payload.machineBrand,
         machineModel: payload.machineModel,
-        ip: payload.ip,
+        ip: detectedIp,
         isAlive: true,
         connectedAt: new Date(),
         appuser_id: appuser.id

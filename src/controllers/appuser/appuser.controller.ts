@@ -8,6 +8,21 @@ import appuserService, { AppUserService } from "../../services/appuser/appuser.s
 class PersonalController extends Controller<AppUserService> {
   protected service = appuserService;
 
+  async getAll(req: Request, res: Response) {
+    try {
+      const { limit, offset } = this.parseQuery(req);
+      const hasScheduleRaw = req.query['has_schedule'];
+      const hasSchedule =
+        hasScheduleRaw === 'true' ? true :
+        hasScheduleRaw === 'false' ? false :
+        undefined;
+
+      const data = await this.service.getAllWithScheduleFilter(limit, offset, undefined, hasSchedule);
+      res.status(200).json(data);
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  }
 
   async findByEmail(req: Request, res: Response) {
 

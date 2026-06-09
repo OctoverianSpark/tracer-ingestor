@@ -56,7 +56,19 @@ model groups {
   name              String  @unique
   block_own_reports Boolean @default(false)
 
-  appuser appuser[]
+  appuser   appuser[]
+  can_view  group_visibility[] @relation("GroupViewers")
+  viewed_by group_visibility[] @relation("GroupVisible")
+}
+
+model group_visibility {
+  viewer_group_id  Int
+  visible_group_id Int
+  viewer_group     groups @relation("GroupViewers", fields: [viewer_group_id], references: [id], onDelete: Cascade)
+  visible_group    groups @relation("GroupVisible", fields: [visible_group_id], references: [id], onDelete: Cascade)
+
+  @@id([viewer_group_id, visible_group_id])
+  @@index([visible_group_id])
 }
 
 model state_logs {
