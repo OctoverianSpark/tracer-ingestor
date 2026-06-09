@@ -114,10 +114,13 @@ class TracerController extends Controller<ProgramationService> {
         IntervalStart: string;
         IntervalEnd: string;
         Apps: string;
+        ActiveSeconds?: number;
+        IdleSeconds?: number;
+        MouseClicks?: number;
+        Keystrokes?: number;
       }[];
 
       const workerId = payload[0]?.WorkerId;
-      console.log(workerId);
       if (!workerId) return res.status(400).json({ error: "No WorkerId" });
 
       const computer = await prisma.computers.findFirst({
@@ -127,10 +130,14 @@ class TracerController extends Controller<ProgramationService> {
 
       await prisma.app_usage_logs.createMany({
         data: payload.map(log => ({
-          computer_id: computer.id,
+          computer_id:    computer.id,
           interval_start: new Date(log.IntervalStart),
-          interval_end: new Date(log.IntervalEnd),
-          apps: JSON.parse(log.Apps)
+          interval_end:   new Date(log.IntervalEnd),
+          apps:           JSON.parse(log.Apps),
+          active_seconds: log.ActiveSeconds ?? 0,
+          idle_seconds:   log.IdleSeconds   ?? 0,
+          mouse_clicks:   log.MouseClicks   ?? 0,
+          keystrokes:     log.Keystrokes    ?? 0,
         }))
       });
 

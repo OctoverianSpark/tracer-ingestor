@@ -95,6 +95,10 @@ model app_usage_logs {
   interval_start DateTime   @db.DateTime(0)
   interval_end   DateTime   @db.DateTime(0)
   apps           Json
+  active_seconds Int        @default(0)
+  idle_seconds   Int        @default(0)
+  mouse_clicks   Int        @default(0)
+  keystrokes     Int        @default(0)
   computer       computers? @relation(fields: [computer_id], references: [id], onDelete: SetNull)
 
   @@index([computer_id])

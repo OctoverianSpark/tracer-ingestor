@@ -32,6 +32,7 @@ export
   machineModel: string;
   isAlive: boolean;
   ip: string;
+  localIp?: string;
   connectedAt: Date;
   appuser_id: bigint;
 }

@@ -43,10 +43,21 @@ export const startWs = () => {
 
 
 
-      const detectedIp =
-        (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim()
-        ?? req.socket.remoteAddress
-        ?? payload.ip;
+      const normalizeIp = (ip: string | undefined) =>
+        ip?.replace(/^::ffff:/i, '').trim() || undefined;
+
+      // x-forwarded-for puede tener múltiples IPs: "client, proxy1, proxy2"
+      // La última IP de confianza es la que puso el proxy más cercano al servidor.
+      const forwardedIps = (req.headers['x-forwarded-for'] as string | undefined)
+        ?.split(',').map(s => s.trim()).filter(Boolean) ?? [];
+      const forwardedIp = normalizeIp(forwardedIps[0]);
+
+      const socketIp = normalizeIp(req.socket.remoteAddress);
+
+      // Prioridad: IP local (LAN) reportada por el cliente > IP detectada por el servidor
+      const localIp = normalizeIp(payload.localIp as string | undefined);
+
+      const detectedIp = localIp ?? forwardedIp ?? socketIp ?? payload.ip;
 
       await wsHub.addClient({
         ws: ws,
