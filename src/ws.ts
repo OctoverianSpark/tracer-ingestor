@@ -68,6 +68,7 @@ export const startWs = () => {
         machineModel: payload.machineModel,
         ip: detectedIp,
         isAlive: true,
+        isRdp: (payload as any).isRdp === "true",
         connectedAt: new Date(),
         appuser_id: appuser.id
       }, ws);

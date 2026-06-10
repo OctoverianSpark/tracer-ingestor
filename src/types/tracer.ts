@@ -33,6 +33,7 @@ export
   isAlive: boolean;
   ip: string;
   localIp?: string;
+  isRdp: boolean;
   connectedAt: Date;
   appuser_id: bigint;
 }

@@ -22,6 +22,7 @@ class WsHub {
         machineModel: client.machineModel ?? "",
         ip: client.ip_address ?? "",
         isAlive: false,
+        isRdp: false,
         connectedAt: new Date(),
         appuser_id: client.appuser_id!
       });

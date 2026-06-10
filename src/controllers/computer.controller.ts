@@ -47,6 +47,34 @@ class ComputerController extends Controller<ComputerService> {
     }
   }
 
+  async shutdownMachine(req: Request, res: Response) {
+    const { serial } = req.params;
+    console.log(`[SHUTDOWN] serial=${serial}`);
+    const msg = createAction(ActionMessageTypes.Shutdown);
+    try {
+      wsHub.sendTo(serial as string, msg as ActionMessage);
+      console.log(`[SHUTDOWN] OK serial=${serial}`);
+      res.json({ ok: true });
+    } catch (err) {
+      console.error(`[SHUTDOWN] Error serial=${serial}`, err);
+      res.status(409).json({ error: "Maquina apagada o fuera de linea" });
+    }
+  }
+
+  async restartMachine(req: Request, res: Response) {
+    const { serial } = req.params;
+    console.log(`[RESTART] serial=${serial}`);
+    const msg = createAction(ActionMessageTypes.Restart);
+    try {
+      wsHub.sendTo(serial as string, msg as ActionMessage);
+      console.log(`[RESTART] OK serial=${serial}`);
+      res.json({ ok: true });
+    } catch (err) {
+      console.error(`[RESTART] Error serial=${serial}`, err);
+      res.status(409).json({ error: "Maquina apagada o fuera de linea" });
+    }
+  }
+
   async notifyMachine(req: Request, res: Response) {
     const { serial } = req.params;
     const { title, message } = req.body as { title: string; message: string };
@@ -150,5 +178,5 @@ class ComputerController extends Controller<ComputerService> {
 }
 
 const computerController = new ComputerController();
-export const { lockMachine, notifyMachine, listMachines, getAll, getReport, getScreenshot, sendFileToMachine } = computerController;
+export const { lockMachine, shutdownMachine, restartMachine, notifyMachine, listMachines, getAll, getReport, getScreenshot, sendFileToMachine } = computerController;
 export default computerController;
