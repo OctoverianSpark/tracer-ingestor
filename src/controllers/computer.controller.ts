@@ -94,6 +94,25 @@ class ComputerController extends Controller<ComputerService> {
     }
   }
 
+  async setTakeScreenshots(req: Request, res: Response) {
+    const { serial } = req.params as { serial: string };
+    const { enabled } = req.body as { enabled: boolean };
+    if (typeof enabled !== "boolean") {
+      return res.status(400).json({ error: "enabled must be boolean" });
+    }
+    console.log(`[TAKE-SCREENSHOTS] serial=${serial} enabled=${enabled}`);
+    try {
+      await this.service.setTakeScreenshots(serial, enabled);
+      res.json({ ok: true, serial, take_screenshots: enabled });
+    } catch (error: any) {
+      if (error?.code === "P2025") {
+        return res.status(404).json({ error: "Computer not found" });
+      }
+      console.error(`[TAKE-SCREENSHOTS] Error serial=${serial}`, error);
+      res.status(500).json({ error: "Failed to update permission" });
+    }
+  }
+
   async listMachines(req: Request, res: Response) {
     try {
       const machines = await wsHub.listAll();
@@ -178,5 +197,5 @@ class ComputerController extends Controller<ComputerService> {
 }
 
 const computerController = new ComputerController();
-export const { lockMachine, shutdownMachine, restartMachine, notifyMachine, listMachines, getAll, getReport, getScreenshot, sendFileToMachine } = computerController;
+export const { lockMachine, shutdownMachine, restartMachine, notifyMachine, listMachines, getAll, getReport, getScreenshot, sendFileToMachine, setTakeScreenshots } = computerController;
 export default computerController;

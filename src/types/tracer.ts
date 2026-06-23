@@ -83,4 +83,16 @@ export interface NotificationMessage extends MessageBase {
 
 export type WsMessage = ActionMessage | FileMessage | NotificationMessage
 
+export interface DashboardConnection {
+  ws: WebSocket
+  id: string
+  isAlive: boolean
+  connectedAt: Date
+}
+
+export type DashboardEvent =
+  | { event: 'machine_online';      data: { serial: string; hostname: string; ip: string; username: string; appuser_id: string } }
+  | { event: 'machine_offline';     data: { serial: string; hostname: string } }
+  | { event: 'user_status_changed'; data: { appuser_id: string; absence_status: string | null } }
+
 

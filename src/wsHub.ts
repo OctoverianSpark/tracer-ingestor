@@ -1,10 +1,11 @@
 // wsHub.ts
 import WebSocket from "ws";
-import type { ClientConnection, WsMessage } from "./types/tracer.js";
+import type { ClientConnection, DashboardConnection, DashboardEvent, WsMessage } from "./types/tracer.js";
 import prisma from "./lib/prisma.js";
 
 class WsHub {
   private clients = new Map<string, ClientConnection>();
+  private dashboardClients = new Map<string, DashboardConnection>();
   private connectionQueues = new Map<string, Promise<void>>();
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -38,6 +39,16 @@ class WsHub {
         }
         client.isAlive = false;
         client.ws.ping();
+      }
+
+      for (const [id, dashboard] of this.dashboardClients.entries()) {
+        if (!dashboard.ws || dashboard.ws.readyState !== WebSocket.OPEN) continue;
+        if (!dashboard.isAlive) {
+          this.removeDashboard(id);
+          continue;
+        }
+        dashboard.isAlive = false;
+        dashboard.ws.ping();
       }
     }, 30_000);
   }
@@ -118,6 +129,17 @@ class WsHub {
 
     console.log(`🟢 ${client.machineName} ${existing?.ws ? "re-connected" : "connected"}`);
     this.clients.set(client.machineSerial, { ...client, ws, isAlive: true, connectedAt: new Date() });
+
+    this.broadcastToDashboards({
+      event: 'machine_online',
+      data: {
+        serial:     client.machineSerial,
+        hostname:   client.machineName,
+        ip:         client.ip,
+        username:   client.userName,
+        appuser_id: String(client.appuser_id)
+      }
+    });
   }
 
   shutdown() {
@@ -126,6 +148,10 @@ class WsHub {
       if (client.ws) client.ws.close(1001, "Server shutting down");
     }
     this.clients.clear();
+    for (const client of this.dashboardClients.values()) {
+      if (client.ws) client.ws.close(1001, "Server shutting down");
+    }
+    this.dashboardClients.clear();
   }
 
   removeClient(machineSerial: string) {
@@ -145,6 +171,11 @@ class WsHub {
     client.ws = null as unknown as WebSocket;
     client.isAlive = false;
     console.log(`🔴 ${client.machineName} disconnected`);
+
+    this.broadcastToDashboards({
+      event: 'machine_offline',
+      data: { serial: machineSerial, hostname: client.machineName }
+    });
 
     prisma.computers.updateMany({
       where: { serial_number: machineSerial },
@@ -176,6 +207,37 @@ class WsHub {
   isOnline(machineSerial: string): boolean {
     const client = this.clients.get(machineSerial);
     return !!client?.ws && client.ws.readyState === WebSocket.OPEN;
+  }
+
+  addDashboard(id: string, ws: WebSocket): void {
+    const existing = this.dashboardClients.get(id);
+    if (existing?.ws?.readyState === WebSocket.OPEN) {
+      existing.ws.close(1000, "Replaced by newer connection");
+    }
+    this.dashboardClients.set(id, { ws, id, isAlive: true, connectedAt: new Date() });
+    console.log(`📊 Dashboard connected: ${id}`);
+  }
+
+  removeDashboard(id: string, ws?: WebSocket): void {
+    const client = this.dashboardClients.get(id);
+    if (!client) return;
+    if (ws && client.ws !== ws) return;
+    if (client.ws?.readyState === WebSocket.OPEN) client.ws.close();
+    this.dashboardClients.delete(id);
+    console.log(`📊 Dashboard disconnected: ${id}`);
+  }
+
+  getDashboard(id: string): DashboardConnection | undefined {
+    return this.dashboardClients.get(id);
+  }
+
+  broadcastToDashboards(event: DashboardEvent): void {
+    const msg = JSON.stringify(event);
+    for (const client of this.dashboardClients.values()) {
+      if (client.ws?.readyState === WebSocket.OPEN) {
+        client.ws.send(msg);
+      }
+    }
   }
 
   async listAll() {

@@ -148,6 +148,17 @@ class TracerController extends Controller<ProgramationService> {
     }
   }
 
+  async getPermissions(req: Request, res: Response) {
+    const { serial } = req.query as { serial: string };
+    if (!serial) return res.status(400).json({ error: "Missing serial" });
+    const computer = await prisma.computers.findUnique({
+      where: { serial_number: serial },
+      select: { take_screenshots: true }
+    });
+    if (!computer) return res.status(404).json({ error: "Computer not found" });
+    res.json({ ok: true, take_screenshots: computer.take_screenshots });
+  }
+
   async pingData(_req: Request, res: Response) {
     console.log("API CONNECTED WITH TRACER");
     res.json({ msg: { text: "Hello" } });
@@ -328,5 +339,5 @@ class TracerController extends Controller<ProgramationService> {
 }
 
 const tracerController = new TracerController();
-export const { getStateLogs, syncStates, syncAppUsage, pingData, ProgramationSave, GetProgramations, GetSchedules, SchedulePersonal, getUpdateInfo, downloadUpdate, uploadUpdate, getReleaseManifest, downloadPackage } = tracerController;
+export const { getStateLogs, syncStates, syncAppUsage, pingData, ProgramationSave, GetProgramations, GetSchedules, SchedulePersonal, getUpdateInfo, downloadUpdate, uploadUpdate, getReleaseManifest, downloadPackage, getPermissions } = tracerController;
 export default tracerController;

@@ -23,6 +23,13 @@ class ComputerService extends Service<computers, Prisma.computersCreateInput, Pr
     return await this.model.delete({ where: { serial_number: serial } });
   }
 
+  async setTakeScreenshots(serial: string, enabled: boolean) {
+    return await this.model.update({
+      where: { serial_number: serial },
+      data: { take_screenshots: enabled }
+    });
+  }
+
 }
 
 

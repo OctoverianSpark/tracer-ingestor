@@ -25,11 +25,28 @@ export const startWs = () => {
         return;
       }
 
-      const decoded = jwt.verify(
-        token,
-        process.env.JWT_SECRET!
-      )
+      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
 
+      // --- Dashboard client ---
+      if (decoded.role === "dashboard") {
+        const email = decoded.email as string | undefined;
+        if (!email) { ws.close(); return; }
+
+        const appuser = await prisma.appuser.findFirst({ where: { email } });
+        if (!appuser) { ws.close(); return; }
+
+        wsHub.addDashboard(email, ws);
+
+        ws.on("pong", () => {
+          const client = wsHub.getDashboard(email);
+          if (client) client.isAlive = true;
+        });
+
+        ws.on("close", () => wsHub.removeDashboard(email, ws));
+        return;
+      }
+
+      // --- Desktop agent client ---
       const payload = decoded as ClientConnection & { email: string }
 
       const appuser = await prisma.appuser.findFirst({
@@ -41,20 +58,15 @@ export const startWs = () => {
         return;
       }
 
-
-
       const normalizeIp = (ip: string | undefined) =>
         ip?.replace(/^::ffff:/i, '').trim() || undefined;
 
-      // x-forwarded-for puede tener múltiples IPs: "client, proxy1, proxy2"
-      // La última IP de confianza es la que puso el proxy más cercano al servidor.
       const forwardedIps = (req.headers['x-forwarded-for'] as string | undefined)
         ?.split(',').map(s => s.trim()).filter(Boolean) ?? [];
       const forwardedIp = normalizeIp(forwardedIps[0]);
 
       const socketIp = normalizeIp(req.socket.remoteAddress);
 
-      // Prioridad: IP local (LAN) reportada por el cliente > IP detectada por el servidor
       const localIp = normalizeIp(payload.localIp as string | undefined);
 
       const detectedIp = localIp ?? forwardedIp ?? socketIp ?? payload.ip;
@@ -72,8 +84,6 @@ export const startWs = () => {
         connectedAt: new Date(),
         appuser_id: appuser.id
       }, ws);
-
-
 
       ws.on("pong", () => {
         const client = wsHub.getClient(payload.machineSerial);
