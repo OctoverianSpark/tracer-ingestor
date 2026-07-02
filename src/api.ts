@@ -8,6 +8,7 @@ import appuserRoutes from "./routes/appuser.routes.js"
 import computerRoutes from "./routes/computer.routes.js"
 import scheduleRoutes from "./routes/schedules.routes.js"
 import programationRoutes from "./routes/programation.routes.js"
+import rotationCycleRoutes from "./routes/rotation_cycles.routes.js"
 import groupsRouter from "./routes/groups.routes.js"
 import rolesRoutes from "./routes/roles.routes.js"
 import categorizationAppsRoutes from "./routes/categorization_apps.routes.js"
@@ -34,6 +35,7 @@ export function startApi() {
   app.use('/machines', computerRoutes)
   app.use('/schedules', scheduleRoutes)
   app.use('/programations', programationRoutes)
+  app.use('/rotation-cycles', rotationCycleRoutes)
   app.use('/groups', groupsRouter)
   app.use('/roles', rolesRoutes)
   app.use('/categorization-apps', categorizationAppsRoutes)

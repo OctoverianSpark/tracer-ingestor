@@ -48,6 +48,7 @@ model appuser {
   schedules    schedules[]
   group_id     Int?
   group        groups?     @relation(fields: [group_id], references: [id], onDelete: SetNull)
+  rotation_cycle rotation_cycles?
 
   @@index([group_id])
   @@index([role_id])
@@ -109,13 +110,14 @@ model app_usage_logs {
 }
 
 model programation {
-  id          BigInt      @id @default(autoincrement())
-  name        String      @unique @db.VarChar(255)
-  start_day   String
-  start_lunch String
-  end_lunch   String
-  end_day     String
-  schedules   schedules[]
+  id             BigInt           @id @default(autoincrement())
+  name           String           @unique @db.VarChar(255)
+  start_day      String
+  start_lunch    String
+  end_lunch      String
+  end_day        String
+  schedules      schedules[]
+  rotation_slots rotation_slots[]
 }
 
 model schedules {
@@ -127,6 +129,31 @@ model schedules {
   programation    programation @relation(fields: [programation_id], references: [id], onDelete: Cascade)
 
   @@unique([appuser_id, day_of_week])
+  @@index([programation_id])
+}
+
+model rotation_cycles {
+  id         BigInt   @id @default(autoincrement())
+  appuser_id BigInt   @unique
+  name       String   @db.VarChar(255)
+  start_date DateTime @db.Date
+  weeks      Int
+  created_at DateTime? @default(now()) @db.DateTime(0)
+  updated_at DateTime? @updatedAt @db.DateTime(0)
+  appuser    appuser          @relation(fields: [appuser_id], references: [id], onDelete: Cascade)
+  slots      rotation_slots[]
+}
+
+model rotation_slots {
+  id                BigInt          @id @default(autoincrement())
+  rotation_cycle_id BigInt
+  week_index        Int
+  day_of_week       String          @db.VarChar(20)
+  programation_id   BigInt
+  rotation_cycle    rotation_cycles @relation(fields: [rotation_cycle_id], references: [id], onDelete: Cascade)
+  programation      programation    @relation(fields: [programation_id], references: [id], onDelete: Cascade)
+
+  @@unique([rotation_cycle_id, week_index, day_of_week])
   @@index([programation_id])
 }
 

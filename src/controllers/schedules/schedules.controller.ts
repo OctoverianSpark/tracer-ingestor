@@ -24,7 +24,24 @@ class ScheduleController extends Controller<ScheduleService> {
     }
   }
 
+  async getEffective(req: Request, res: Response) {
+    try {
+      const appuser_id = Number(req.query.appuser_id);
+      const date = req.query.date as string;
 
+      if (!req.query.appuser_id || isNaN(appuser_id)) throw new Error('Invalid or missing appuser_id');
+      if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Invalid or missing date');
+
+      const programation = await this.service.getEffectiveSchedule(BigInt(appuser_id), date);
+
+      if (!programation) return res.status(204).send();
+
+      res.status(200).json(programation);
+    } catch (error: any) {
+      console.log(error);
+      res.status(400).json({ ok: false, error: error.message });
+    }
+  }
 
 
 }

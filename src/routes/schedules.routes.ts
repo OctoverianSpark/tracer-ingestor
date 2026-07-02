@@ -6,6 +6,7 @@ import schedulesController from "../controllers/schedules/schedules.controller.j
 const scheduleRoutes = Router()
 
 scheduleRoutes.get('/', schedulesController.getAll)
+scheduleRoutes.get('/effective', schedulesController.getEffective)
 scheduleRoutes.post('/save', schedulesController.saveSchedules)
 scheduleRoutes.get('/find/:id', schedulesController.getById)
 scheduleRoutes.put('/update/:id', schedulesController.update)
