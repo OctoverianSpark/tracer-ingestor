@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { state_log_type, programation } from "@prisma/client";
+import { state_log_type, programation, Prisma } from "@prisma/client";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
@@ -75,16 +75,25 @@ class TracerController extends Controller<ProgramationService> {
       if (!computer) return res.status(404).json({ error: "Computer not found" });
 
       const groupId = computer.appuser?.group_id ?? null;
-      let states = groupId !== null ? await prisma.states.findMany({ where: { group_id: groupId } }) : [];
-      if (states.length === 0) states = await prisma.states.findMany({ where: { group_id: null } });
-      const statesByCode = new Map(states.map(s => [s.code, s]));
+      const [defaultStates, groupStates] = await Promise.all([
+        prisma.states.findMany({ where: { group_id: null } }),
+        groupId !== null ? prisma.states.findMany({ where: { group_id: groupId } }) : Promise.resolve([])
+      ]);
+      // El catálogo por grupo puede ser parcial (solo customiza algunos codes):
+      // parte del default y superpone las entradas del grupo, en vez de reemplazo total.
+      const statesByCode = new Map(defaultStates.map(s => [s.code, s]));
+      for (const s of groupStates) statesByCode.set(s.code, s);
 
       // La categoría se deriva del estado (states.category_id), no del código "Category" del agente.
-      const rows = payload.map(log => {
+      const rows: Prisma.state_logsUncheckedCreateInput[] = [];
+      for (const log of payload) {
         const type = typeMap[log.Type];
         const state = statesByCode.get(log.State);
-        if (!state || !type) throw new Error(`Unknown enum value in log: State=${log.State} Type=${log.Type}`);
-        return {
+        if (!state || !type) {
+          console.warn(`[states] descartando registro con enum desconocido: State=${log.State} Type=${log.Type} computer_id=${computer.id}`);
+          continue;
+        }
+        rows.push({
           computer_id: computer.id,
           user_name: log.WorkerUserName,
           code: log.State,
@@ -92,11 +101,11 @@ class TracerController extends Controller<ProgramationService> {
           category_id: state.category_id,
           type,
           timestamp: new Date(log.Timestamp)
-        };
-      });
+        });
+      }
 
-      console.log("[states] insertando", rows.length, "registros");
-      await prisma.state_logs.createMany({ data: rows });
+      console.log("[states] insertando", rows.length, "de", payload.length, "registros");
+      if (rows.length > 0) await prisma.state_logs.createMany({ data: rows });
 
       res.json({ ok: true, count: payload.length });
     } catch (err) {
