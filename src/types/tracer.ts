@@ -43,7 +43,9 @@ export enum MessageTypes {
 
   Action,
   File,
-  Notification
+  Notification,
+  SyncData,
+  UserInfo
 }
 
 export enum ActionMessageTypes {
@@ -80,8 +82,29 @@ export interface NotificationMessage extends MessageBase {
   text: string
 }
 
+/** Enviado por el agente en respuesta a ActionMessageTypes.Sync, con el estado actual de la máquina. */
+export interface SyncDataMessage extends MessageBase {
+  type: MessageTypes.SyncData
+  hostname?: string
+  ip?: string
+  username?: string
+  machineBrand?: string
+  machineModel?: string
+}
 
-export type WsMessage = ActionMessage | FileMessage | NotificationMessage
+/** Respuesta del servidor al SyncDataMessage, con los datos del usuario asignado a la máquina. */
+export interface UserInfoMessage extends MessageBase {
+  type: MessageTypes.UserInfo
+  appuser_id: string | null
+  full_name: string | null
+  email: string | null
+  role: string | null
+  group: string | null
+  absence_status: string | null
+}
+
+
+export type WsMessage = ActionMessage | FileMessage | NotificationMessage | SyncDataMessage | UserInfoMessage
 
 export interface DashboardConnection {
   ws: WebSocket

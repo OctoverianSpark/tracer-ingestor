@@ -15,6 +15,45 @@ const SCREENSHOTS_DIR = path.join(process.env.SCREENSHOTS_PATH || "../screenshot
 class ComputerController extends Controller<ComputerService> {
   protected service = computerService;
 
+  /** "*" y "group:<id>" engloban varias máquinas; cualquier otro valor es un serial puntual. */
+  private isBatchTarget(target: string): boolean {
+    return target === "*" || target.startsWith("group:");
+  }
+
+  private async resolveSerials(target: string): Promise<string[]> {
+    if (target === "*") {
+      const computers = await prisma.computers.findMany({
+        where: { serial_number: { not: null } },
+        select: { serial_number: true }
+      });
+      return computers.map(c => c.serial_number!);
+    }
+
+    if (target.startsWith("group:")) {
+      const groupId = Number(target.slice("group:".length));
+      if (!Number.isInteger(groupId)) return [];
+      const computers = await prisma.computers.findMany({
+        where: { appuser: { group_id: groupId }, serial_number: { not: null } },
+        select: { serial_number: true }
+      });
+      return computers.map(c => c.serial_number!);
+    }
+
+    return [target];
+  }
+
+  private async runBatch(target: string, action: (serial: string) => unknown) {
+    const serials = await this.resolveSerials(target);
+    return Promise.all(serials.map(async serial => {
+      try {
+        await action(serial);
+        return { serial, ok: true };
+      } catch (err: any) {
+        return { serial, ok: false, error: err?.message ?? "Unknown error" };
+      }
+    }));
+  }
+
   async deleteBySerial(req: Request, res: Response) {
     const { serial } = req.params as { serial: string };
     console.log(`[DELETE] serial=${serial}`);
@@ -34,64 +73,123 @@ class ComputerController extends Controller<ComputerService> {
   }
 
   async lockMachine(req: Request, res: Response) {
-    const { serial } = req.params;
-    console.log(`[LOCK] serial=${serial}`);
+    const { serial } = req.params as { serial: string };
+    console.log(`[LOCK] target=${serial}`);
     const msg = createAction(ActionMessageTypes.Lock);
-    try {
-      wsHub.sendTo(serial as string, msg as ActionMessage);
-      console.log(`[LOCK] OK serial=${serial}`);
-      res.json({ ok: true });
-    } catch (err) {
-      console.error(`[LOCK] Error serial=${serial}`, err);
-      res.status(409).json({ error: "Maquina apagada o fuera de linea" });
+
+    if (!this.isBatchTarget(serial)) {
+      try {
+        wsHub.sendTo(serial, msg as ActionMessage);
+        console.log(`[LOCK] OK serial=${serial}`);
+        return res.json({ ok: true });
+      } catch (err) {
+        console.error(`[LOCK] Error serial=${serial}`, err);
+        return res.status(409).json({ error: "Maquina apagada o fuera de linea" });
+      }
     }
+
+    const results = await this.runBatch(serial, s => wsHub.sendTo(s, msg as ActionMessage));
+    if (results.length === 0) return res.status(404).json({ error: "No matching machines found" });
+    const failed = results.filter(r => !r.ok);
+    console.log(`[LOCK] batch target=${serial} sent=${results.length - failed.length} failed=${failed.length}`);
+    res.json({ ok: failed.length === 0, sent: results.length - failed.length, failed: failed.length, results });
   }
 
   async shutdownMachine(req: Request, res: Response) {
-    const { serial } = req.params;
-    console.log(`[SHUTDOWN] serial=${serial}`);
+    const { serial } = req.params as { serial: string };
+    console.log(`[SHUTDOWN] target=${serial}`);
     const msg = createAction(ActionMessageTypes.Shutdown);
-    try {
-      wsHub.sendTo(serial as string, msg as ActionMessage);
-      console.log(`[SHUTDOWN] OK serial=${serial}`);
-      res.json({ ok: true });
-    } catch (err) {
-      console.error(`[SHUTDOWN] Error serial=${serial}`, err);
-      res.status(409).json({ error: "Maquina apagada o fuera de linea" });
+
+    if (!this.isBatchTarget(serial)) {
+      try {
+        wsHub.sendTo(serial, msg as ActionMessage);
+        console.log(`[SHUTDOWN] OK serial=${serial}`);
+        return res.json({ ok: true });
+      } catch (err) {
+        console.error(`[SHUTDOWN] Error serial=${serial}`, err);
+        return res.status(409).json({ error: "Maquina apagada o fuera de linea" });
+      }
     }
+
+    const results = await this.runBatch(serial, s => wsHub.sendTo(s, msg as ActionMessage));
+    if (results.length === 0) return res.status(404).json({ error: "No matching machines found" });
+    const failed = results.filter(r => !r.ok);
+    console.log(`[SHUTDOWN] batch target=${serial} sent=${results.length - failed.length} failed=${failed.length}`);
+    res.json({ ok: failed.length === 0, sent: results.length - failed.length, failed: failed.length, results });
   }
 
   async restartMachine(req: Request, res: Response) {
-    const { serial } = req.params;
-    console.log(`[RESTART] serial=${serial}`);
+    const { serial } = req.params as { serial: string };
+    console.log(`[RESTART] target=${serial}`);
     const msg = createAction(ActionMessageTypes.Restart);
-    try {
-      wsHub.sendTo(serial as string, msg as ActionMessage);
-      console.log(`[RESTART] OK serial=${serial}`);
-      res.json({ ok: true });
-    } catch (err) {
-      console.error(`[RESTART] Error serial=${serial}`, err);
-      res.status(409).json({ error: "Maquina apagada o fuera de linea" });
+
+    if (!this.isBatchTarget(serial)) {
+      try {
+        wsHub.sendTo(serial, msg as ActionMessage);
+        console.log(`[RESTART] OK serial=${serial}`);
+        return res.json({ ok: true });
+      } catch (err) {
+        console.error(`[RESTART] Error serial=${serial}`, err);
+        return res.status(409).json({ error: "Maquina apagada o fuera de linea" });
+      }
     }
+
+    const results = await this.runBatch(serial, s => wsHub.sendTo(s, msg as ActionMessage));
+    if (results.length === 0) return res.status(404).json({ error: "No matching machines found" });
+    const failed = results.filter(r => !r.ok);
+    console.log(`[RESTART] batch target=${serial} sent=${results.length - failed.length} failed=${failed.length}`);
+    res.json({ ok: failed.length === 0, sent: results.length - failed.length, failed: failed.length, results });
   }
 
   async notifyMachine(req: Request, res: Response) {
-    const { serial } = req.params;
+    const { serial } = req.params as { serial: string };
     const { title, message } = req.body as { title: string; message: string };
-    console.log(`[NOTIFY] serial=${serial} title="${title}"`);
-    try {
-      const msg: WsMessage = {
-        type: MessageTypes.Notification,
-        title: title as string,
-        text: message as string
-      } as NotificationMessage;
-      wsHub.sendTo(serial as string, msg);
-      console.log(`[NOTIFY] OK serial=${serial}`);
-      res.json({ ok: true });
-    } catch (error) {
-      console.error(`[NOTIFY] Error serial=${serial}`, error);
-      res.status(409).json({ error: "Maquina apagada o fuera de linea" });
+    console.log(`[NOTIFY] target=${serial} title="${title}"`);
+    const msg: WsMessage = {
+      type: MessageTypes.Notification,
+      title: title as string,
+      text: message as string
+    } as NotificationMessage;
+
+    if (!this.isBatchTarget(serial)) {
+      try {
+        wsHub.sendTo(serial, msg);
+        console.log(`[NOTIFY] OK serial=${serial}`);
+        return res.json({ ok: true });
+      } catch (error) {
+        console.error(`[NOTIFY] Error serial=${serial}`, error);
+        return res.status(409).json({ error: "Maquina apagada o fuera de linea" });
+      }
     }
+
+    const results = await this.runBatch(serial, s => wsHub.sendTo(s, msg));
+    if (results.length === 0) return res.status(404).json({ error: "No matching machines found" });
+    const failed = results.filter(r => !r.ok);
+    console.log(`[NOTIFY] batch target=${serial} sent=${results.length - failed.length} failed=${failed.length}`);
+    res.json({ ok: failed.length === 0, sent: results.length - failed.length, failed: failed.length, results });
+  }
+
+  async syncMachine(req: Request, res: Response) {
+    const { serial } = req.params as { serial: string };
+    console.log(`[SYNC] target=${serial}`);
+    const msg = createAction(ActionMessageTypes.Sync);
+
+    if (!this.isBatchTarget(serial)) {
+      try {
+        wsHub.sendTo(serial, msg as ActionMessage);
+        console.log(`[SYNC] OK serial=${serial}`);
+        return res.json({ ok: true });
+      } catch (err) {
+        console.error(`[SYNC] Error serial=${serial}`, err);
+        return res.status(409).json({ error: "Maquina apagada o fuera de linea" });
+      }
+    }
+
+    const results = await this.runBatch(serial, s => wsHub.sendTo(s, msg as ActionMessage));
+    if (results.length === 0) return res.status(404).json({ error: "No matching machines found" });
+    const failed = results.filter(r => !r.ok);
+    console.log(`[SYNC] batch target=${serial} sent=${results.length - failed.length} failed=${failed.length}`);
+    res.json({ ok: failed.length === 0, sent: results.length - failed.length, failed: failed.length, results });
   }
 
   async setTakeScreenshots(req: Request, res: Response) {
@@ -100,17 +198,26 @@ class ComputerController extends Controller<ComputerService> {
     if (typeof enabled !== "boolean") {
       return res.status(400).json({ error: "enabled must be boolean" });
     }
-    console.log(`[TAKE-SCREENSHOTS] serial=${serial} enabled=${enabled}`);
-    try {
-      await this.service.setTakeScreenshots(serial, enabled);
-      res.json({ ok: true, serial, take_screenshots: enabled });
-    } catch (error: any) {
-      if (error?.code === "P2025") {
-        return res.status(404).json({ error: "Computer not found" });
+    console.log(`[TAKE-SCREENSHOTS] target=${serial} enabled=${enabled}`);
+
+    if (!this.isBatchTarget(serial)) {
+      try {
+        await this.service.setTakeScreenshots(serial, enabled);
+        return res.json({ ok: true, serial, take_screenshots: enabled });
+      } catch (error: any) {
+        if (error?.code === "P2025") {
+          return res.status(404).json({ error: "Computer not found" });
+        }
+        console.error(`[TAKE-SCREENSHOTS] Error serial=${serial}`, error);
+        return res.status(500).json({ error: "Failed to update permission" });
       }
-      console.error(`[TAKE-SCREENSHOTS] Error serial=${serial}`, error);
-      res.status(500).json({ error: "Failed to update permission" });
     }
+
+    const results = await this.runBatch(serial, s => this.service.setTakeScreenshots(s, enabled));
+    if (results.length === 0) return res.status(404).json({ error: "No matching machines found" });
+    const failed = results.filter(r => !r.ok);
+    console.log(`[TAKE-SCREENSHOTS] batch target=${serial} updated=${results.length - failed.length} failed=${failed.length}`);
+    res.json({ ok: failed.length === 0, take_screenshots: enabled, sent: results.length - failed.length, failed: failed.length, results });
   }
 
   async listMachines(req: Request, res: Response) {
@@ -169,7 +276,7 @@ class ComputerController extends Controller<ComputerService> {
   }
 
   async sendFileToMachine(req: Request, res: Response) {
-    const { serial } = req.params;
+    const { serial } = req.params as { serial: string };
     const file = req.file;
     if (!file) {
       return res.status(400).json({ error: 'No file provided' });
@@ -177,25 +284,34 @@ class ComputerController extends Controller<ComputerService> {
     if (!serial) {
       return res.status(400).json({ error: 'Machine serial required' });
     }
-    console.log(`[SEND-FILE] serial=${serial} file="${file.originalname}" size=${file.size}`);
-    try {
-      const payload: FileMessage = {
-        type: MessageTypes.File,
-        fileName: file.originalname,
-        fileSize: file.size,
-        mimeType: file.mimetype,
-        data: file.buffer.toString('base64')
-      } as FileMessage;
-      wsHub.sendTo(serial as string, payload);
-      console.log(`[SEND-FILE] OK serial=${serial}`);
-      res.json({ success: true, message: `File ${file.originalname} sent to ${serial}`, fileSize: file.size });
-    } catch (error) {
-      console.error(`[SEND-FILE] Error serial=${serial}`, error);
-      res.status(500).json({ error: 'Failed to send file' });
+    console.log(`[SEND-FILE] target=${serial} file="${file.originalname}" size=${file.size}`);
+    const payload: FileMessage = {
+      type: MessageTypes.File,
+      fileName: file.originalname,
+      fileSize: file.size,
+      mimeType: file.mimetype,
+      data: file.buffer.toString('base64')
+    } as FileMessage;
+
+    if (!this.isBatchTarget(serial)) {
+      try {
+        wsHub.sendTo(serial, payload);
+        console.log(`[SEND-FILE] OK serial=${serial}`);
+        return res.json({ success: true, message: `File ${file.originalname} sent to ${serial}`, fileSize: file.size });
+      } catch (error) {
+        console.error(`[SEND-FILE] Error serial=${serial}`, error);
+        return res.status(500).json({ error: 'Failed to send file' });
+      }
     }
+
+    const results = await this.runBatch(serial, s => wsHub.sendTo(s, payload));
+    if (results.length === 0) return res.status(404).json({ error: "No matching machines found" });
+    const failed = results.filter(r => !r.ok);
+    console.log(`[SEND-FILE] batch target=${serial} sent=${results.length - failed.length} failed=${failed.length}`);
+    res.json({ success: failed.length === 0, fileSize: file.size, sent: results.length - failed.length, failed: failed.length, results });
   }
 }
 
 const computerController = new ComputerController();
-export const { lockMachine, shutdownMachine, restartMachine, notifyMachine, listMachines, getAll, getReport, getScreenshot, sendFileToMachine, setTakeScreenshots } = computerController;
+export const { lockMachine, shutdownMachine, restartMachine, notifyMachine, syncMachine, listMachines, getAll, getReport, getScreenshot, sendFileToMachine, setTakeScreenshots } = computerController;
 export default computerController;

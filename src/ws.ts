@@ -2,7 +2,8 @@
 import { WebSocketServer } from "ws";
 import jwt from "jsonwebtoken";
 import { wsHub } from "./wsHub.js";
-import type { ClientConnection } from "./types/tracer.js";
+import type { ClientConnection, WsMessage } from "./types/tracer.js";
+import { MessageTypes } from "./types/tracer.js";
 import prisma from "./lib/prisma.js";
 
 const wss = new WebSocketServer({ host: '0.0.0.0', port: 8080 });
@@ -96,6 +97,16 @@ export const startWs = () => {
 
       ws.on("message", data => {
         console.log(`📩 ${payload.machineName}:`, data.toString());
+        let msg: WsMessage;
+        try {
+          msg = JSON.parse(data.toString());
+        } catch {
+          return;
+        }
+        if (msg.type === MessageTypes.SyncData) {
+          wsHub.handleSyncData(payload.machineSerial, ws, msg)
+            .catch(err => console.error(`[sync] Error processing sync from ${payload.machineName}:`, err));
+        }
       });
 
     } catch (err) {

@@ -59,9 +59,10 @@ model groups {
   name              String  @unique
   block_own_reports Boolean @default(false)
 
-  appuser   appuser[]
-  can_view  group_visibility[] @relation("GroupViewers")
-  viewed_by group_visibility[] @relation("GroupVisible")
+  appuser              appuser[]
+  can_view             group_visibility[]        @relation("GroupViewers")
+  viewed_by            group_visibility[]        @relation("GroupVisible")
+  report_type_assigned report_type_assignments[]
 }
 
 model group_visibility {
@@ -155,6 +156,26 @@ model rotation_slots {
 
   @@unique([rotation_cycle_id, week_index, day_of_week])
   @@index([programation_id])
+}
+
+model report_types {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique @db.VarChar(255)
+  description String?  @db.Text
+  created_at  DateTime? @default(now()) @db.DateTime(0)
+  updated_at  DateTime? @updatedAt @db.DateTime(0)
+
+  assignments report_type_assignments[]
+}
+
+model report_type_assignments {
+  report_type_id Int
+  group_id       Int
+  report_type    report_types @relation(fields: [report_type_id], references: [id], onDelete: Cascade)
+  group          groups       @relation(fields: [group_id], references: [id], onDelete: Cascade)
+
+  @@id([report_type_id, group_id])
+  @@index([group_id])
 }
 
 model categorization_apps {

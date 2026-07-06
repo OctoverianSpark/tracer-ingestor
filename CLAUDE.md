@@ -27,6 +27,8 @@ Punto de entrada: `src/server.ts` → `src/api.ts` (registro de rutas y middlewa
 | `/roles` | `roles.routes.ts` |
 | `/categorization-apps` | `categorization_apps.routes.ts` |
 | `/app-usage-logs` | `app_usage_logs.routes.ts` |
+| `/report-types` | `report_types.routes.ts` |
+| `/report-type-assignments` | `report_type_assignments.routes.ts` |
 
 ## Endpoint de actualizaciones (`/tracer/updates`)
 

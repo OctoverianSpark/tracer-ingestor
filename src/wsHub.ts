@@ -1,6 +1,7 @@
 // wsHub.ts
 import WebSocket from "ws";
-import type { ClientConnection, DashboardConnection, DashboardEvent, WsMessage } from "./types/tracer.js";
+import type { ClientConnection, DashboardConnection, DashboardEvent, SyncDataMessage, UserInfoMessage, WsMessage } from "./types/tracer.js";
+import { MessageTypes } from "./types/tracer.js";
 import prisma from "./lib/prisma.js";
 
 class WsHub {
@@ -140,6 +141,48 @@ class WsHub {
         appuser_id: String(client.appuser_id)
       }
     });
+  }
+
+  /** Procesa el SyncDataMessage que el agente envía en respuesta a ActionMessageTypes.Sync. */
+  async handleSyncData(machineSerial: string, ws: WebSocket, data: SyncDataMessage) {
+    const client = this.clients.get(machineSerial);
+    if (!client) return;
+
+    const hostname = data.hostname ?? client.machineName;
+    const ip = data.ip ?? client.ip;
+    const userName = data.username ?? client.userName;
+    const machineBrand = data.machineBrand ?? client.machineBrand;
+    const machineModel = data.machineModel ?? client.machineModel;
+
+    this.clients.set(machineSerial, { ...client, machineName: hostname, ip, userName, machineBrand, machineModel });
+
+    const computer = await prisma.computers.update({
+      where: { serial_number: machineSerial },
+      data: {
+        hostname,
+        ip_address: ip,
+        username: userName,
+        machineBrand,
+        machineModel,
+        last_seen: new Date()
+      },
+      include: { appuser: { include: { role: true, group: true } } }
+    });
+
+    const appuser = computer.appuser;
+    const response: UserInfoMessage = {
+      type: MessageTypes.UserInfo,
+      appuser_id: appuser ? String(appuser.id) : null,
+      full_name: appuser?.full_name ?? null,
+      email: appuser?.email ?? null,
+      role: appuser?.role?.name ?? null,
+      group: appuser?.group?.name ?? null,
+      absence_status: appuser?.absence_status ?? null
+    };
+
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(response));
+    }
   }
 
   shutdown() {
