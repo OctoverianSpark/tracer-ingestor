@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(grep -n \"\\\\`states\\\\`\\\\|\\\\`state_categories\\\\`\" -A10)",
-      "Bash(npx prisma *)"
+      "Bash(npx prisma *)",
+      "Bash(npx tsc *)"
     ]
   }
 }

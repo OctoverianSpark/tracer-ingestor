@@ -178,6 +178,7 @@ class WsHub {
       role: appuser?.role?.name ?? null,
       access_level: appuser?.role?.access_level ?? null,
       group: appuser?.group?.name ?? null,
+      group_id: appuser?.group_id ?? null,
       absence_status: appuser?.absence_status ?? null
     };
 

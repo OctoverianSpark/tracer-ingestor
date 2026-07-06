@@ -101,6 +101,7 @@ export interface UserInfoMessage extends MessageBase {
   role: string | null
   access_level: unknown | null
   group: string | null
+  group_id: number | null
   absence_status: string | null
 }
 
