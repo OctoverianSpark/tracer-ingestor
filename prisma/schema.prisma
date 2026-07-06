@@ -108,16 +108,16 @@ model state_categories {
 }
 
 model states {
-  id                Int              @id @default(autoincrement())
-  key               String           @unique @db.VarChar(50)
-  name              String           @db.VarChar(100)
-  state_category_id Int
-  state_category    state_categories @relation(fields: [state_category_id], references: [id], onDelete: Restrict)
-  sort_order        Int              @default(0)
+  id          Int              @id @default(autoincrement())
+  key         String           @unique @db.VarChar(50)
+  name        String           @db.VarChar(100)
+  category_id Int
+  category    state_categories @relation(fields: [category_id], references: [id], onDelete: Restrict)
+  sort_order  Int              @default(0)
 
-  state_logs        state_logs[]
+  state_logs  state_logs[]
 
-  @@index([state_category_id])
+  @@index([category_id])
 }
 
 model app_usage_logs {

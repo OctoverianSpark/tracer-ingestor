@@ -87,7 +87,7 @@ class TracerController extends Controller<ProgramationService> {
       const states = await prisma.states.findMany();
       const statesByKey = new Map(states.map(s => [s.key, s]));
 
-      // La categoría se deriva del estado (states.state_category_id), no del código "Category" del agente.
+      // La categoría se deriva del estado (states.category_id), no del código "Category" del agente.
       const rows = payload.map(log => {
         const key = stateKeyMap[log.State];
         const type = typeMap[log.Type];
@@ -97,7 +97,7 @@ class TracerController extends Controller<ProgramationService> {
           computer_id: computer.id,
           user_name: log.WorkerUserName,
           state_id: state.id,
-          category_id: state.state_category_id,
+          category_id: state.category_id,
           type,
           timestamp: new Date(log.Timestamp)
         };

@@ -17,7 +17,7 @@ class StatesService extends Service<
       ...(limit !== undefined && { take: limit }),
       ...(offset !== undefined && { skip: offset }),
       orderBy: { sort_order: "asc" },
-      include: { state_category: true }
+      include: { category: true }
     });
   }
 }
