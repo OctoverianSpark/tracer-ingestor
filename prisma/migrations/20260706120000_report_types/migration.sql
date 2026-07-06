@@ -12,11 +12,13 @@ CREATE TABLE `report_types` (
 
 -- CreateTable
 CREATE TABLE `report_type_assignments` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
     `report_type_id` INTEGER NOT NULL,
     `group_id` INTEGER NOT NULL,
 
     INDEX `report_type_assignments_group_id_idx`(`group_id`),
-    PRIMARY KEY (`report_type_id`, `group_id`)
+    UNIQUE INDEX `report_type_assignments_report_type_id_group_id_key`(`report_type_id`, `group_id`),
+    PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- AddForeignKey

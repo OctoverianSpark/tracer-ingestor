@@ -5,6 +5,6 @@ const reportTypeAssignmentsRoutes = Router();
 
 reportTypeAssignmentsRoutes.get("/", reportTypeAssignmentController.getAll);
 reportTypeAssignmentsRoutes.post("/save", reportTypeAssignmentController.save);
-reportTypeAssignmentsRoutes.delete("/delete/:report_type_id/:group_id", reportTypeAssignmentController.delete);
+reportTypeAssignmentsRoutes.delete("/delete/:id", reportTypeAssignmentController.delete);
 
 export default reportTypeAssignmentsRoutes;

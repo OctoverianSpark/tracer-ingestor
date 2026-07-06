@@ -15,6 +15,8 @@ import categorizationAppsRoutes from "./routes/categorization_apps.routes.js"
 import appUsageLogsRoutes from "./routes/app_usage_logs.routes.js"
 import reportTypesRoutes from "./routes/report_types.routes.js"
 import reportTypeAssignmentsRoutes from "./routes/report_type_assignments.routes.js"
+import stateCategoriesRoutes from "./routes/state_categories.routes.js"
+import statesRoutes from "./routes/states.routes.js"
 
 
 export function startApi() {
@@ -44,6 +46,8 @@ export function startApi() {
   app.use('/app-usage-logs', appUsageLogsRoutes)
   app.use('/report-types', reportTypesRoutes)
   app.use('/report-type-assignments', reportTypeAssignmentsRoutes)
+  app.use('/state-categories', stateCategoriesRoutes)
+  app.use('/states', statesRoutes)
 
 
   app.get("/", pingData)

@@ -99,6 +99,7 @@ export interface UserInfoMessage extends MessageBase {
   full_name: string | null
   email: string | null
   role: string | null
+  access_level: unknown | null
   group: string | null
   absence_status: string | null
 }

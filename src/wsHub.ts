@@ -176,6 +176,7 @@ class WsHub {
       full_name: appuser?.full_name ?? null,
       email: appuser?.email ?? null,
       role: appuser?.role?.name ?? null,
+      access_level: appuser?.role?.access_level ?? null,
       group: appuser?.group?.name ?? null,
       absence_status: appuser?.absence_status ?? null
     };

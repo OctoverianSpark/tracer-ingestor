@@ -23,6 +23,7 @@ model computers {
   app_usage_logs app_usage_logs[]
   appuser        appuser?         @relation(fields: [appuser_id], references: [id], onDelete: SetNull)
   state_logs     state_logs[]
+  reports        reports[]
 
   @@index([hostname])
   @@index([appuser_id])
@@ -49,6 +50,7 @@ model appuser {
   group_id     Int?
   group        groups?     @relation(fields: [group_id], references: [id], onDelete: SetNull)
   rotation_cycle rotation_cycles?
+  reports      reports[]
 
   @@index([group_id])
   @@index([role_id])
@@ -76,21 +78,46 @@ model group_visibility {
 }
 
 model state_logs {
-  id          BigInt             @id @default(autoincrement())
+  id          BigInt           @id @default(autoincrement())
   computer_id BigInt?
-  user_name   String?            @db.VarChar(100)
-  state       state_log_state
-  category    state_log_category
+  user_name   String?          @db.VarChar(100)
+  state_id    Int
+  category_id Int
   type        state_log_type
-  timestamp   DateTime           @db.DateTime(0)
-  reason      String?            @db.VarChar(255)
-  computer    computers?         @relation(fields: [computer_id], references: [id], onDelete: SetNull)
+  timestamp   DateTime         @db.DateTime(0)
+  reason      String?          @db.VarChar(255)
+  computer    computers?       @relation(fields: [computer_id], references: [id], onDelete: SetNull)
+  state       states           @relation(fields: [state_id], references: [id], onDelete: Restrict)
+  category    state_categories @relation(fields: [category_id], references: [id], onDelete: Restrict)
 
   @@index([computer_id])
   @@index([timestamp])
   @@index([computer_id, timestamp])
-  @@index([state])
-  @@index([category])
+  @@index([state_id])
+  @@index([category_id])
+}
+
+model state_categories {
+  id         Int    @id @default(autoincrement())
+  key        String @unique @db.VarChar(50)
+  name       String @db.VarChar(100)
+  sort_order Int    @default(0)
+
+  states     states[]
+  state_logs state_logs[]
+}
+
+model states {
+  id                Int              @id @default(autoincrement())
+  key               String           @unique @db.VarChar(50)
+  name              String           @db.VarChar(100)
+  state_category_id Int
+  state_category    state_categories @relation(fields: [state_category_id], references: [id], onDelete: Restrict)
+  sort_order        Int              @default(0)
+
+  state_logs        state_logs[]
+
+  @@index([state_category_id])
 }
 
 model app_usage_logs {
@@ -166,16 +193,35 @@ model report_types {
   updated_at  DateTime? @updatedAt @db.DateTime(0)
 
   assignments report_type_assignments[]
+  reports     reports[]
 }
 
 model report_type_assignments {
+  id             Int          @id @default(autoincrement())
   report_type_id Int
   group_id       Int
   report_type    report_types @relation(fields: [report_type_id], references: [id], onDelete: Cascade)
   group          groups       @relation(fields: [group_id], references: [id], onDelete: Cascade)
 
-  @@id([report_type_id, group_id])
+  @@unique([report_type_id, group_id])
   @@index([group_id])
+}
+
+model reports {
+  id             BigInt       @id @default(autoincrement())
+  report_type_id Int
+  computer_id    BigInt?
+  appuser_id     BigInt?
+  message        String       @db.Text
+  created_at     DateTime?    @default(now()) @db.DateTime(0)
+
+  report_type    report_types @relation(fields: [report_type_id], references: [id], onDelete: Cascade)
+  computer       computers?   @relation(fields: [computer_id], references: [id], onDelete: SetNull)
+  appuser        appuser?     @relation(fields: [appuser_id], references: [id], onDelete: SetNull)
+
+  @@index([report_type_id])
+  @@index([computer_id])
+  @@index([appuser_id])
 }
 
 model categorization_apps {
@@ -188,22 +234,6 @@ enum category {
   productive
   unproductive
   ignore
-}
-
-enum state_log_state {
-  working
-  overtime
-  break
-  wc
-  lunch
-  idle
-  offline
-}
-
-enum state_log_category {
-  active
-  neutral
-  inactive
 }
 
 enum state_log_type {

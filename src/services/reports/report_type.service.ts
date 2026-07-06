@@ -19,6 +19,15 @@ class ReportTypeService extends Service<
       include: { assignments: { include: { group: true } } }
     });
   }
+
+  /** El dashboard hace create-or-update contra un único POST /save. */
+  async save(data: Prisma.report_typesUncheckedCreateInput): Promise<report_types> {
+    if (data.id !== undefined && data.id !== null) {
+      const { id, ...rest } = data;
+      return this.model.update({ where: { id }, data: rest });
+    }
+    return this.model.create({ data });
+  }
 }
 
 export type { ReportTypeService };

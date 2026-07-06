@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { state_log_category, state_log_state, state_log_type, programation } from "@prisma/client";
+import { state_log_type, programation } from "@prisma/client";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
@@ -8,7 +8,8 @@ import Controller from "./controller.js";
 import programationService, { type ProgramationService } from "../services/schedules/programation.service.js";
 import { INSTALLERS_DIR } from "../config/multer.js";
 
-const stateMap: Record<number, state_log_state> = {
+/** Mapea el código numérico que manda el agente a la `key` del catálogo `states`. */
+const stateKeyMap: Record<number, string> = {
   0: "working",
   1: "overtime",
   2: "break",
@@ -16,12 +17,6 @@ const stateMap: Record<number, state_log_state> = {
   4: "lunch",
   5: "idle",
   6: "offline"
-};
-
-const categoryMap: Record<number, state_log_category> = {
-  0: "active",
-  1: "neutral",
-  2: "inactive"
 };
 
 const typeMap: Record<number, state_log_type> = {
@@ -60,7 +55,8 @@ class TracerController extends Controller<ProgramationService> {
     const { computer_id } = req.query;
     if (!computer_id) return res.status(400).json({ error: "Missing computer_id" });
     const data = await prisma.state_logs.findMany({
-      where: { computer_id: BigInt(computer_id as string) }
+      where: { computer_id: BigInt(computer_id as string) },
+      include: { state: true, category: true }
     });
     return res.status(200).json({ ok: true, data });
   }
@@ -88,12 +84,23 @@ class TracerController extends Controller<ProgramationService> {
       console.log("[states] computer encontrado:", computer ? `id=${computer.id} hostname=${computer.hostname}` : "null");
       if (!computer) return res.status(404).json({ error: "Computer not found" });
 
+      const states = await prisma.states.findMany();
+      const statesByKey = new Map(states.map(s => [s.key, s]));
+
+      // La categoría se deriva del estado (states.state_category_id), no del código "Category" del agente.
       const rows = payload.map(log => {
-        const state = stateMap[log.State];
-        const category = categoryMap[log.Category];
+        const key = stateKeyMap[log.State];
         const type = typeMap[log.Type];
-        if (!state || !category || !type) throw new Error(`Unknown enum value in log: State=${log.State} Category=${log.Category} Type=${log.Type}`);
-        return { computer_id: computer.id, user_name: log.WorkerUserName, state, category, type, timestamp: new Date(log.Timestamp) };
+        const state = key !== undefined ? statesByKey.get(key) : undefined;
+        if (!state || !type) throw new Error(`Unknown enum value in log: State=${log.State} Type=${log.Type}`);
+        return {
+          computer_id: computer.id,
+          user_name: log.WorkerUserName,
+          state_id: state.id,
+          category_id: state.state_category_id,
+          type,
+          timestamp: new Date(log.Timestamp)
+        };
       });
 
       console.log("[states] insertando", rows.length, "registros");
