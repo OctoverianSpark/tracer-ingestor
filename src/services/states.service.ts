@@ -4,7 +4,7 @@ import prisma from "../lib/prisma.js";
 
 class StatesService extends Service<
   states,
-  Prisma.statesCreateInput,
+  Prisma.statesUncheckedCreateInput,
   Prisma.statesUpdateInput,
   Prisma.statesWhereInput,
   Prisma.statesWhereUniqueInput
@@ -19,6 +19,14 @@ class StatesService extends Service<
       orderBy: { sort_order: "asc" },
       include: { category: true }
     });
+  }
+
+  /** El code (0-6) debe ser único dentro de su propio catálogo (mismo group_id, incluyendo el default). */
+  async save(data: Prisma.statesUncheckedCreateInput) {
+    const group_id = data.group_id ?? null;
+    const duplicate = await this.model.findFirst({ where: { group_id, code: data.code } });
+    if (duplicate) throw new Error(`El código ${data.code} ya está en uso en este catálogo`);
+    return this.model.create({ data, include: { category: true } });
   }
 }
 

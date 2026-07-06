@@ -8,17 +8,6 @@ import Controller from "./controller.js";
 import programationService, { type ProgramationService } from "../services/schedules/programation.service.js";
 import { INSTALLERS_DIR } from "../config/multer.js";
 
-/** Mapea el código numérico que manda el agente a la `key` del catálogo `states`. */
-const stateKeyMap: Record<number, string> = {
-  0: "working",
-  1: "overtime",
-  2: "break",
-  3: "wc",
-  4: "lunch",
-  5: "idle",
-  6: "offline"
-};
-
 const typeMap: Record<number, state_log_type> = {
   0: "auto",
   1: "manual"
@@ -79,19 +68,21 @@ class TracerController extends Controller<ProgramationService> {
       if (!workerId) return res.status(400).json({ error: "No WorkerId" });
 
       const computer = await prisma.computers.findFirst({
-        where: { hostname: workerId }
+        where: { hostname: workerId },
+        include: { appuser: { select: { group_id: true } } }
       });
       console.log("[states] computer encontrado:", computer ? `id=${computer.id} hostname=${computer.hostname}` : "null");
       if (!computer) return res.status(404).json({ error: "Computer not found" });
 
-      const states = await prisma.states.findMany();
-      const statesByKey = new Map(states.map(s => [s.key, s]));
+      const groupId = computer.appuser?.group_id ?? null;
+      let states = groupId !== null ? await prisma.states.findMany({ where: { group_id: groupId } }) : [];
+      if (states.length === 0) states = await prisma.states.findMany({ where: { group_id: null } });
+      const statesByCode = new Map(states.map(s => [s.code, s]));
 
       // La categoría se deriva del estado (states.category_id), no del código "Category" del agente.
       const rows = payload.map(log => {
-        const key = stateKeyMap[log.State];
         const type = typeMap[log.Type];
-        const state = key !== undefined ? statesByKey.get(key) : undefined;
+        const state = statesByCode.get(log.State);
         if (!state || !type) throw new Error(`Unknown enum value in log: State=${log.State} Type=${log.Type}`);
         return {
           computer_id: computer.id,

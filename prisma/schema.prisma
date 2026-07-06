@@ -65,6 +65,8 @@ model groups {
   can_view             group_visibility[]        @relation("GroupViewers")
   viewed_by            group_visibility[]        @relation("GroupVisible")
   report_type_assigned report_type_assignments[]
+  state_categories     state_categories[]
+  states               states[]
 }
 
 model group_visibility {
@@ -98,18 +100,25 @@ model state_logs {
 }
 
 model state_categories {
-  id         Int    @id @default(autoincrement())
-  key        String @unique @db.VarChar(50)
-  name       String @db.VarChar(100)
-  sort_order Int    @default(0)
+  id         Int     @id @default(autoincrement())
+  group_id   Int?
+  group      groups? @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  key        String  @db.VarChar(50)
+  name       String  @db.VarChar(100)
+  color      String? @db.VarChar(20)
+  sort_order Int     @default(0)
 
   states     states[]
   state_logs state_logs[]
+
+  @@index([group_id])
 }
 
 model states {
   id          Int              @id @default(autoincrement())
-  key         String           @unique @db.VarChar(50)
+  group_id    Int?
+  group       groups?          @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  code        Int
   name        String           @db.VarChar(100)
   category_id Int
   category    state_categories @relation(fields: [category_id], references: [id], onDelete: Restrict)
@@ -117,6 +126,7 @@ model states {
 
   state_logs  state_logs[]
 
+  @@index([group_id])
   @@index([category_id])
 }
 

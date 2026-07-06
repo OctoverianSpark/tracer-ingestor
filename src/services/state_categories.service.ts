@@ -4,7 +4,7 @@ import prisma from "../lib/prisma.js";
 
 class StateCategoriesService extends Service<
   state_categories,
-  Prisma.state_categoriesCreateInput,
+  Prisma.state_categoriesUncheckedCreateInput,
   Prisma.state_categoriesUpdateInput,
   Prisma.state_categoriesWhereInput,
   Prisma.state_categoriesWhereUniqueInput
