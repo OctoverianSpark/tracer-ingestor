@@ -87,6 +87,7 @@ class TracerController extends Controller<ProgramationService> {
         return {
           computer_id: computer.id,
           user_name: log.WorkerUserName,
+          code: log.State,
           state_id: state.id,
           category_id: state.category_id,
           type,

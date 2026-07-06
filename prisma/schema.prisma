@@ -80,17 +80,18 @@ model group_visibility {
 }
 
 model state_logs {
-  id          BigInt           @id @default(autoincrement())
+  id          BigInt            @id @default(autoincrement())
   computer_id BigInt?
-  user_name   String?          @db.VarChar(100)
-  state_id    Int
-  category_id Int
+  user_name   String?           @db.VarChar(100)
+  code        Int
+  state_id    Int?
+  category_id Int?
   type        state_log_type
-  timestamp   DateTime         @db.DateTime(0)
-  reason      String?          @db.VarChar(255)
-  computer    computers?       @relation(fields: [computer_id], references: [id], onDelete: SetNull)
-  state       states           @relation(fields: [state_id], references: [id], onDelete: Restrict)
-  category    state_categories @relation(fields: [category_id], references: [id], onDelete: Restrict)
+  timestamp   DateTime          @db.DateTime(0)
+  reason      String?           @db.VarChar(255)
+  computer    computers?        @relation(fields: [computer_id], references: [id], onDelete: SetNull)
+  state       states?           @relation(fields: [state_id], references: [id], onDelete: SetNull)
+  category    state_categories? @relation(fields: [category_id], references: [id], onDelete: SetNull)
 
   @@index([computer_id])
   @@index([timestamp])
@@ -119,10 +120,10 @@ model states {
   group_id    Int?
   group       groups?          @relation(fields: [group_id], references: [id], onDelete: Cascade)
   code        Int
-  name        String           @db.VarChar(100)
-  category_id Int
-  category    state_categories @relation(fields: [category_id], references: [id], onDelete: Restrict)
-  sort_order  Int              @default(0)
+  name        String            @db.VarChar(100)
+  category_id Int?
+  category    state_categories? @relation(fields: [category_id], references: [id], onDelete: SetNull)
+  sort_order  Int               @default(0)
 
   state_logs  state_logs[]
 
