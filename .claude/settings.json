@@ -4,7 +4,14 @@
       "Bash(grep -n \"\\\\`states\\\\`\\\\|\\\\`state_categories\\\\`\" -A10)",
       "Bash(npx prisma *)",
       "Bash(npx tsc *)",
-      "Bash(node -r dotenv/config \"C:/Users/Jean.PR/AppData/Local/Temp/claude/c--Users-Jean-PR-Projects-tracer-ingestor/20525108-021f-440a-b8b3-5a93f78e137d/scratchpad/diagnose.mjs\" dotenv_config_path=.env)"
+      "Bash(node -r dotenv/config \"C:/Users/Jean.PR/AppData/Local/Temp/claude/c--Users-Jean-PR-Projects-tracer-ingestor/20525108-021f-440a-b8b3-5a93f78e137d/scratchpad/diagnose.mjs\" dotenv_config_path=.env)",
+      "Read(//c/Users/Jean.PR/Projects/tracer-dashboard/**)",
+      "Read(//c/Users/Jean.PR/Projects/tracer-dashboard/components/TimeReporting/**)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\Jean.PR\\Projects\\tracer-dashboard\\types",
+      "c:\\Users\\Jean.PR\\Projects\\tracer-dashboard\\app\\th",
+      "c:\\Users\\Jean.PR\\Projects\\tracer-dashboard\\app\\supervisors"
     ]
   }
 }
