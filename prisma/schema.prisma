@@ -124,6 +124,7 @@ model states {
   category_id Int?
   category    state_categories? @relation(fields: [category_id], references: [id], onDelete: SetNull)
   sort_order  Int               @default(0)
+  show_in_menu Boolean          @default(true)
 
   state_logs  state_logs[]
 
