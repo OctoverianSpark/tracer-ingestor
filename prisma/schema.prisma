@@ -67,6 +67,21 @@ model groups {
   report_type_assigned report_type_assignments[]
   state_categories     state_categories[]
   states               states[]
+  hidden_states        group_state_visibility[]
+}
+
+// Catálogo único y global (ver `states`/`state_categories`) — esto NO es un catálogo por grupo.
+// Una fila acá significa "este code está OCULTO del menú del agente para este grupo". Ausencia de
+// fila = visible (hereda el catálogo global). No hay columna booleana a propósito: la mayoría de
+// grupos no ocultan nada o solo un par de codes, así que "fila = excepción" evita 7 filas con un
+// booleano por grupo para el caso común.
+model group_state_visibility {
+  id       Int    @id @default(autoincrement())
+  group_id Int
+  code     Int
+  group    groups @relation(fields: [group_id], references: [id], onDelete: Cascade)
+
+  @@unique([group_id, code])
 }
 
 model group_visibility {

@@ -17,6 +17,7 @@ import reportTypesRoutes from "./routes/report_types.routes.js"
 import reportTypeAssignmentsRoutes from "./routes/report_type_assignments.routes.js"
 import stateCategoriesRoutes from "./routes/state_categories.routes.js"
 import statesRoutes from "./routes/states.routes.js"
+import groupStateVisibilityRoutes from "./routes/group_state_visibility.routes.js"
 
 
 export function startApi() {
@@ -48,6 +49,7 @@ export function startApi() {
   app.use('/report-type-assignments', reportTypeAssignmentsRoutes)
   app.use('/state-categories', stateCategoriesRoutes)
   app.use('/states', statesRoutes)
+  app.use('/group-state-visibility', groupStateVisibilityRoutes)
 
 
   app.get("/", pingData)
