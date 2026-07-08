@@ -13,25 +13,10 @@ class StatesService extends Service<
 > {
   protected model = prisma.states;
 
+  // Devuelve solo las filas propias del catálogo pedido (vacío si ese group_id nunca clonó/creó
+  // nada) — sin fusionar con el default. El dashboard usa "Clonar aquí" para que un grupo arranque
+  // su catálogo con filas propias e independientes; no hay fusión implícita en el read.
   async getAll(limit?: number, offset?: number, where?: Prisma.statesWhereInput) {
-    const groupId = where && typeof where.group_id === "number" ? where.group_id : undefined;
-
-    // Catálogo por grupo: puede ser parcial (solo customiza algunos codes), así que se
-    // reporta ya fusionado con el default en vez de dejar que cada consumidor (dashboard,
-    // agente) reimplemente el fallback — mismo criterio que syncStates al ingerir.
-    if (groupId !== undefined) {
-      const [defaults, overrides] = await Promise.all([
-        this.model.findMany({ where: { group_id: null }, orderBy: { sort_order: "asc" }, include: { category: true } }),
-        this.model.findMany({ where: { group_id: groupId }, orderBy: { sort_order: "asc" }, include: { category: true } })
-      ]);
-      const byCode = new Map(defaults.map(s => [s.code, s]));
-      for (const s of overrides) byCode.set(s.code, s);
-      let merged = [...byCode.values()].sort((a, b) => a.sort_order - b.sort_order);
-      if (offset !== undefined) merged = merged.slice(offset);
-      if (limit !== undefined) merged = merged.slice(0, limit);
-      return merged;
-    }
-
     return this.model.findMany({
       ...(where !== undefined && { where }),
       ...(limit !== undefined && { take: limit }),
