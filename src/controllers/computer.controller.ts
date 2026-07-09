@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { Prisma } from "@prisma/client";
 import { wsHub } from "../wsHub.js";
 import { readdirSync } from "fs";
 import path from "path";
@@ -52,6 +53,22 @@ class ComputerController extends Controller<ComputerService> {
         return { serial, ok: false, error: err?.message ?? "Unknown error" };
       }
     }));
+  }
+
+  /** Igual que resolveSerials pero trayendo los campos que necesita el sync con HelpDESK. */
+  private async resolveMachinesForSync(target: string) {
+    const where: Prisma.computersWhereInput = { serial_number: { not: null } };
+
+    if (target.startsWith("group:")) {
+      const groupId = Number(target.slice("group:".length));
+      if (!Number.isInteger(groupId)) return [];
+      where.appuser = { group_id: groupId };
+    }
+
+    return prisma.computers.findMany({
+      where,
+      select: { serial_number: true, hostname: true, machineBrand: true, machineModel: true, username: true }
+    });
   }
 
   async deleteBySerial(req: Request, res: Response) {
@@ -311,7 +328,10 @@ class ComputerController extends Controller<ComputerService> {
     res.json({ success: failed.length === 0, fileSize: file.size, sent: results.length - failed.length, failed: failed.length, results });
   }
 
-  /** Empuja el inventario de computers hacia el endpoint push de HelpDESK (POST /api/tracer/sync). */
+  /**
+   * Empuja el inventario de computers hacia el endpoint push de HelpDESK (POST /api/tracer/sync).
+   * `target` en el body acepta "*" (todos, default) o "group:<id>" para limitar el envio a un grupo.
+   */
   async syncToHelpdesk(req: Request, res: Response) {
     const url = process.env.HELPDESK_SYNC_URL;
     const apiKey = process.env.HELPDESK_SYNC_API_KEY;
@@ -320,13 +340,16 @@ class ComputerController extends Controller<ComputerService> {
       return res.status(500).json({ ok: false, error: "HELPDESK_SYNC_URL / HELPDESK_SYNC_API_KEY no configurados" });
     }
 
-    try {
-      const machines = await prisma.computers.findMany({
-        where: { serial_number: { not: null } },
-        select: { serial_number: true, hostname: true, machineBrand: true, machineModel: true }
-      });
+    const target = (req.body?.target as string) || "*";
 
-      console.log(`[SYNC-HELPDESK] Enviando ${machines.length} equipos a HelpDESK`);
+    try {
+      const machines = await this.resolveMachinesForSync(target);
+
+      if (machines.length === 0) {
+        return res.status(404).json({ ok: false, error: "No hay equipos para ese destino" });
+      }
+
+      console.log(`[SYNC-HELPDESK] target=${target} enviando ${machines.length} equipos a HelpDESK`);
 
       const response = await fetch(url, {
         method: "POST",
@@ -341,8 +364,8 @@ class ComputerController extends Controller<ComputerService> {
         return res.status(502).json({ ok: false, error: "HelpDESK rechazo la sincronizacion", helpdesk: data });
       }
 
-      console.log(`[SYNC-HELPDESK] OK, ${machines.length} equipos enviados`);
-      res.json({ ok: true, sent: machines.length, helpdesk: data });
+      console.log(`[SYNC-HELPDESK] OK, ${machines.length} equipos enviados (target=${target})`);
+      res.json({ ok: true, sent: machines.length, target, helpdesk: data });
     } catch (error: any) {
       console.error("[SYNC-HELPDESK] Error", error);
       res.status(500).json({ ok: false, error: error.message });
