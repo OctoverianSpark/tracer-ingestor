@@ -310,8 +310,46 @@ class ComputerController extends Controller<ComputerService> {
     console.log(`[SEND-FILE] batch target=${serial} sent=${results.length - failed.length} failed=${failed.length}`);
     res.json({ success: failed.length === 0, fileSize: file.size, sent: results.length - failed.length, failed: failed.length, results });
   }
+
+  /** Empuja el inventario de computers hacia el endpoint push de HelpDESK (POST /api/tracer/sync). */
+  async syncToHelpdesk(req: Request, res: Response) {
+    const url = process.env.HELPDESK_SYNC_URL;
+    const apiKey = process.env.HELPDESK_SYNC_API_KEY;
+
+    if (!url || !apiKey) {
+      return res.status(500).json({ ok: false, error: "HELPDESK_SYNC_URL / HELPDESK_SYNC_API_KEY no configurados" });
+    }
+
+    try {
+      const machines = await prisma.computers.findMany({
+        where: { serial_number: { not: null } },
+        select: { serial_number: true, hostname: true, machineBrand: true, machineModel: true }
+      });
+
+      console.log(`[SYNC-HELPDESK] Enviando ${machines.length} equipos a HelpDESK`);
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Api-Key": apiKey },
+        body: JSON.stringify({ machines })
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        console.error(`[SYNC-HELPDESK] HelpDESK respondio ${response.status}`, data);
+        return res.status(502).json({ ok: false, error: "HelpDESK rechazo la sincronizacion", helpdesk: data });
+      }
+
+      console.log(`[SYNC-HELPDESK] OK, ${machines.length} equipos enviados`);
+      res.json({ ok: true, sent: machines.length, helpdesk: data });
+    } catch (error: any) {
+      console.error("[SYNC-HELPDESK] Error", error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  }
 }
 
 const computerController = new ComputerController();
-export const { lockMachine, shutdownMachine, restartMachine, notifyMachine, syncMachine, listMachines, getAll, getReport, getScreenshot, sendFileToMachine, setTakeScreenshots } = computerController;
+export const { lockMachine, shutdownMachine, restartMachine, notifyMachine, syncMachine, listMachines, getAll, getReport, getScreenshot, sendFileToMachine, setTakeScreenshots, syncToHelpdesk } = computerController;
 export default computerController;
