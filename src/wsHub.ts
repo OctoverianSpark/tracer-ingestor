@@ -2,6 +2,7 @@
 import WebSocket from "ws";
 import type { ClientConnection, DashboardConnection, DashboardEvent, SyncDataMessage, UserInfoMessage, WsMessage } from "./types/tracer.js";
 import { MessageTypes } from "./types/tracer.js";
+import { resolveAgentPreferences } from "./types/agent-preferences.js";
 import prisma from "./lib/prisma.js";
 
 class WsHub {
@@ -179,7 +180,8 @@ class WsHub {
       access_level: appuser?.role?.access_level ?? null,
       group: appuser?.group?.name ?? null,
       group_id: appuser?.group_id ?? null,
-      absence_status: appuser?.absence_status ?? null
+      absence_status: appuser?.absence_status ?? null,
+      preferences: resolveAgentPreferences(appuser?.group?.agent_preferences)
     };
 
     if (ws.readyState === WebSocket.OPEN) {

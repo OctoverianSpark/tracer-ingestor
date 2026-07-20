@@ -60,6 +60,7 @@ model groups {
   id                Int     @id @default(autoincrement())
   name              String  @unique
   block_own_reports Boolean @default(false)
+  agent_preferences Json?
 
   appuser              appuser[]
   can_view             group_visibility[]        @relation("GroupViewers")

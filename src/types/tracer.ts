@@ -1,4 +1,5 @@
 import WebSocket from "ws"
+import type { AgentPreferences } from "./agent-preferences.js"
 export interface BatchPayload {
   agent_uuid: string
   user: string
@@ -103,6 +104,7 @@ export interface UserInfoMessage extends MessageBase {
   group: string | null
   group_id: number | null
   absence_status: string | null
+  preferences: AgentPreferences
 }
 
 
