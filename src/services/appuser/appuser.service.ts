@@ -37,6 +37,21 @@ class AppUserService extends Service<appuser, Prisma.appuserCreateInput, Prisma.
     })
     return deletedUsers
   }
+
+  // El dashboard usa JWT sin estado (sin tabla de sesiones) — esta marca es lo único que permite
+  // invalidar una sesión ya emitida; el middleware la compara contra el valor congelado en el JWT.
+  async revokeSession(id: bigint) {
+    return prisma.appuser.update({
+      where: { id },
+      data: { force_logout_at: new Date() },
+    })
+  }
+
+  async revokeAllSessions() {
+    return prisma.appuser.updateMany({
+      data: { force_logout_at: new Date() },
+    })
+  }
 }
 
 

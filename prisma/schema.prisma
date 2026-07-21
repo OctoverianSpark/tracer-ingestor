@@ -51,6 +51,8 @@ model appuser {
   group        groups?     @relation(fields: [group_id], references: [id], onDelete: SetNull)
   rotation_cycle rotation_cycles?
   reports      reports[]
+  lunch_skips  lunch_skips[]
+  force_logout_at DateTime? @db.DateTime(0)
 
   @@index([group_id])
   @@index([role_id])
@@ -210,6 +212,19 @@ model rotation_slots {
 
   @@unique([rotation_cycle_id, week_index, day_of_week])
   @@index([programation_id])
+}
+
+// Excepción puntual sobre la Programation resuelta ese día: la presencia de una fila significa
+// "este usuario no tiene almuerzo en esta fecha". No modifica la Programation (fila de catálogo
+// compartida por muchos usuarios/días) — mismo criterio que group_state_visibility.
+model lunch_skips {
+  id         BigInt   @id @default(autoincrement())
+  appuser_id BigInt
+  date       DateTime @db.Date
+  appuser    appuser  @relation(fields: [appuser_id], references: [id], onDelete: Cascade)
+
+  @@unique([appuser_id, date])
+  @@index([date])
 }
 
 model report_types {

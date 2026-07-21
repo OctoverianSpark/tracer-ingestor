@@ -63,7 +63,37 @@ class PersonalController extends Controller<AppUserService> {
     }
   }
 
+  // Payload mínimo: es lo que consulta el middleware del dashboard en cada request para saber
+  // si la sesión activa fue revocada después del login.
+  async getForceLogoutStatus(req: Request, res: Response) {
+    try {
+      const id = BigInt(req.params.id as string);
+      const user = await prisma.appuser.findUnique({ where: { id }, select: { force_logout_at: true } });
+      if (!user) return res.status(404).json({ error: "Usuario no encontrado" });
+      res.status(200).json({ force_logout_at: user.force_logout_at });
+    } catch (error: any) {
+      res.status(400).json({ ok: false, error: error.message });
+    }
+  }
 
+  async revokeSession(req: Request, res: Response) {
+    try {
+      const id = BigInt(req.params.id as string);
+      const data = await this.service.revokeSession(id);
+      res.status(200).json({ ok: true, force_logout_at: data.force_logout_at });
+    } catch (error: any) {
+      res.status(400).json({ ok: false, error: error.message });
+    }
+  }
+
+  async revokeAllSessions(_req: Request, res: Response) {
+    try {
+      const data = await this.service.revokeAllSessions();
+      res.status(200).json({ ok: true, count: data.count });
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  }
 
 }
 
