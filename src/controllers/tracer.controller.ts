@@ -193,8 +193,20 @@ class TracerController extends Controller<ProgramationService> {
     res.status(501).json({ error: "Not implemented" });
   }
 
-  private resolveInstaller(version?: string): { version: string; filePath: string; filename: string; stat: fs.Stats; sha256: string } | null {
-    console.log(`[updates] resolveInstaller — buscando en: ${INSTALLERS_DIR}${version ? ` | versión solicitada: ${version}` : " | versión más reciente"}`);
+  // "package": el .nupkg que necesita el canal de auto-actualización de Velopack (releases.win.json).
+  // "installer": el ejecutable que un humano corre para instalar de cero en un equipo nuevo — el
+  // Setup.exe del agente Tracer, no el del Host (GoTracer.Host.Setup-x.x.x.exe, instalador aparte)
+  // ni el nupkg (no es ejecutable de primera instalación por sí solo).
+  private pickInstallerFile(files: string[], kind: "package" | "installer"): string {
+    if (kind === "installer") {
+      const exe = files.find((f: string) => /-setup\.exe$/i.test(f) && !/\.host\./i.test(f));
+      if (exe) return exe;
+    }
+    return files.find((f: string) => f.toLowerCase().endsWith(".nupkg")) ?? files[0]!;
+  }
+
+  private resolveInstaller(version?: string, kind: "package" | "installer" = "package"): { version: string; filePath: string; filename: string; stat: fs.Stats; sha256: string } | null {
+    console.log(`[updates] resolveInstaller — buscando en: ${INSTALLERS_DIR}${version ? ` | versión solicitada: ${version}` : " | versión más reciente"} | tipo: ${kind}`);
 
     const entries = fs.readdirSync(INSTALLERS_DIR).filter((f: string) => !f.startsWith("."));
 
@@ -220,9 +232,14 @@ class TracerController extends Controller<ProgramationService> {
     // Busca primero en subcarpetas, luego en archivos planos
     const folderTargets = version ? versionFolders.filter((v: string) => v === version) : versionFolders;
     for (const v of folderTargets) {
-      const files = fs.readdirSync(path.join(INSTALLERS_DIR, v)).filter((f: string) => !f.startsWith("."));
+      const files = fs.readdirSync(path.join(INSTALLERS_DIR, v))
+        .filter((f: string) => !f.startsWith(".") && !f.endsWith(".sha256"));
       if (files.length > 0) {
-        const filename = files[0]!;
+        // Un directorio de release trae varios artefactos (Setup.exe, full.nupkg, Host.Setup.exe) —
+        // sin elegir por tipo, el primer archivo por orden alfabético podía no ser el correcto para
+        // el caso de uso (ej. Velopack recibiendo un .exe en vez del .nupkg, y no lo aplicaba como
+        // versión instalada — el agente veía "hay actualización" en cada chequeo sin parar).
+        const filename = this.pickInstallerFile(files, kind);
         const filePath = path.join(INSTALLERS_DIR, v, filename);
         const stat = fs.statSync(filePath);
         const sha256 = getSha256(filePath);
@@ -233,7 +250,12 @@ class TracerController extends Controller<ProgramationService> {
 
     const flatTargets = version ? flatFiles.filter((f: FlatEntry) => f.version === version) : flatFiles;
     if (flatTargets.length > 0) {
-      const f = flatTargets[0]!;
+      // Mismo criterio que arriba: varios archivos planos pueden compartir la misma versión
+      // (Setup.exe y full.nupkg sueltos en installers/) — elegir según el tipo pedido.
+      const topVersion = flatTargets[0]!.version;
+      const sameVersion = flatTargets.filter((f: FlatEntry) => f.version === topVersion);
+      const filename = this.pickInstallerFile(sameVersion.map((f: FlatEntry) => f.filename), kind);
+      const f = sameVersion.find((f: FlatEntry) => f.filename === filename) ?? sameVersion[0]!;
       console.log(`[updates] instalador encontrado (plano) — versión: ${f.version} | archivo: ${f.filename}`);
       return f;
     }
@@ -246,7 +268,7 @@ class TracerController extends Controller<ProgramationService> {
     const requestedVersion = req.query.version as string | undefined;
     console.log(`[updates] GET /updates — consulta de info${requestedVersion ? ` | versión: ${requestedVersion}` : " | sin versión especificada (más reciente)"} | ip: ${req.ip}`);
     try {
-      const installer = this.resolveInstaller(requestedVersion);
+      const installer = this.resolveInstaller(requestedVersion, "installer");
       if (!installer) return res.status(404).json({ error: "No installer available" });
 
       console.log(`[updates] respondiendo info: versión=${installer.version} | archivo=${installer.filename} | tamaño=${installer.stat.size}`);
@@ -267,7 +289,7 @@ class TracerController extends Controller<ProgramationService> {
     const requestedVersion = req.query.version as string | undefined;
     console.log(`[updates] GET /updates/download — solicitud de descarga${requestedVersion ? ` | versión: ${requestedVersion}` : " | versión más reciente"} | ip: ${req.ip}`);
     try {
-      const installer = this.resolveInstaller(requestedVersion);
+      const installer = this.resolveInstaller(requestedVersion, "installer");
       if (!installer) return res.status(404).json({ error: "No installer available" });
 
       console.log(`[updates] iniciando envío de archivo: ${installer.filename} (${installer.stat.size} bytes) desde ${installer.filePath}`);

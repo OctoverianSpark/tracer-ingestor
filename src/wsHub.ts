@@ -150,7 +150,9 @@ class WsHub {
     if (!client) return;
 
     const hostname = data.hostname ?? client.machineName;
-    const ip = data.ip ?? client.ip;
+    // La IP se fija en la conexión (ws.ts, desde X-Forwarded-For/socket remoto — IP pública real),
+    // no desde lo que reporta el agente en el SyncData — evita que se sobreescriba con una IP LAN.
+    const ip = client.ip;
     const userName = data.username ?? client.userName;
     const machineBrand = data.machineBrand ?? client.machineBrand;
     const machineModel = data.machineModel ?? client.machineModel;

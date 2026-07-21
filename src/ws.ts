@@ -68,9 +68,13 @@ export const startWs = () => {
 
       const socketIp = normalizeIp(req.socket.remoteAddress);
 
+      // localIp es la IP LAN que el agente reportaba de sí mismo (192.168.x.x) — nunca la IP
+      // pública real, así que va al final como respaldo. forwardedIp/socketIp vienen de la
+      // conexión misma (X-Forwarded-For si hay proxy delante, o la IP del socket TCP directo),
+      // que sí son la IP pública real vista desde afuera.
       const localIp = normalizeIp(payload.localIp as string | undefined);
 
-      const detectedIp = localIp ?? forwardedIp ?? socketIp ?? payload.ip;
+      const detectedIp = forwardedIp ?? socketIp ?? localIp ?? payload.ip;
 
       await wsHub.addClient({
         ws: ws,

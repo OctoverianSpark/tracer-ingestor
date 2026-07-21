@@ -87,7 +87,6 @@ export interface NotificationMessage extends MessageBase {
 export interface SyncDataMessage extends MessageBase {
   type: MessageTypes.SyncData
   hostname?: string
-  ip?: string
   username?: string
   machineBrand?: string
   machineModel?: string
