@@ -182,6 +182,10 @@ model schedules {
   appuser_id      BigInt?
   programation_id BigInt
   day_of_week     String       @db.VarChar(20)
+  // Excepción recurrente: este día de la semana no tiene almuerzo para este usuario, sin
+  // importar el bloque de almuerzo de la Programation (fila de catálogo compartida). Distinto
+  // de `lunch_skips` (excepción de una fecha puntual, no de la asignación recurrente).
+  skip_lunch      Boolean      @default(false)
   appuser         appuser?     @relation(fields: [appuser_id], references: [id], onDelete: Cascade)
   programation    programation @relation(fields: [programation_id], references: [id], onDelete: Cascade)
 
@@ -207,6 +211,8 @@ model rotation_slots {
   week_index        Int
   day_of_week       String          @db.VarChar(20)
   programation_id   BigInt
+  // Mismo criterio que schedules.skip_lunch — excepción recurrente, no de fecha puntual.
+  skip_lunch        Boolean         @default(false)
   rotation_cycle    rotation_cycles @relation(fields: [rotation_cycle_id], references: [id], onDelete: Cascade)
   programation      programation    @relation(fields: [programation_id], references: [id], onDelete: Cascade)
 

@@ -9,7 +9,7 @@ type SaveRotationCycleInput = {
   name: string;
   start_date: string;
   weeks: number;
-  slots: { week_index: number; day_of_week: string; programation_id: number | bigint }[];
+  slots: { week_index: number; day_of_week: string; programation_id: number | bigint; skip_lunch?: boolean }[];
 };
 
 class RotationCycleService extends Service<rotation_cycles, Prisma.rotation_cyclesCreateInput, Prisma.rotation_cyclesUpdateInput, Prisma.rotation_cyclesWhereInput, Prisma.rotation_cyclesWhereUniqueInput> {
@@ -36,6 +36,7 @@ class RotationCycleService extends Service<rotation_cycles, Prisma.rotation_cycl
               week_index: slot.week_index,
               day_of_week: slot.day_of_week,
               programation_id: BigInt(slot.programation_id),
+              skip_lunch: slot.skip_lunch ?? false,
             })),
           },
         },

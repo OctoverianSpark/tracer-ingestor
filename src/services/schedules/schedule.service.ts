@@ -50,7 +50,10 @@ class ScheduleService extends Service<schedules, Prisma.schedulesCreateInput, Pr
                 day_of_week: item.day_of_week as string,
               },
             },
-            update: { programation_id: item.programation_id as bigint },
+            update: {
+              programation_id: item.programation_id as bigint,
+              skip_lunch: (item.skip_lunch as boolean) ?? false,
+            },
             create: item as Prisma.schedulesUncheckedCreateInput,
           })
         )
