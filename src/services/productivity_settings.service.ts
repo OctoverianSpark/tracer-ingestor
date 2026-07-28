@@ -20,7 +20,7 @@ class ProductivitySettingsService extends Service<
     });
   }
 
-  async save(data: { uncategorized_credit: number; productive_credit: number }): Promise<productivity_settings> {
+  async save(data: { uncategorized_credit: number; productive_credit: number; unproductive_credit: number }): Promise<productivity_settings> {
     return this.model.upsert({
       where: { id: 1 },
       update: data,

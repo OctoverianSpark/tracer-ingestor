@@ -18,17 +18,19 @@ class ProductivitySettingsController extends Controller<ProductivitySettingsServ
 
   async updateSettings(req: Request, res: Response) {
     try {
-      const { uncategorized_credit, productive_credit } = req.body as {
+      const { uncategorized_credit, productive_credit, unproductive_credit } = req.body as {
         uncategorized_credit?: number;
         productive_credit?: number;
+        unproductive_credit?: number;
       };
-      if (uncategorized_credit == null || productive_credit == null) {
-        res.status(400).json({ ok: false, error: "uncategorized_credit y productive_credit son requeridos" });
+      if (uncategorized_credit == null || productive_credit == null || unproductive_credit == null) {
+        res.status(400).json({ ok: false, error: "uncategorized_credit, productive_credit y unproductive_credit son requeridos" });
         return;
       }
       const data = await this.service.save({
         uncategorized_credit: Number(uncategorized_credit),
         productive_credit: Number(productive_credit),
+        unproductive_credit: Number(unproductive_credit),
       });
       res.status(200).json(data);
     } catch (error: any) {
