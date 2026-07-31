@@ -234,17 +234,6 @@ model lunch_skips {
   @@index([date])
 }
 
-// Fila única (id fijo en 1) — pesos configurables del cálculo "Global" de productividad
-// (lib/productivity.ts en tracer-dashboard). No es un key-value store genérico a propósito:
-// si aparecen más índices configurables, se agregan como columnas nuevas acá.
-model productivity_settings {
-  id                   Int      @id @default(1)
-  uncategorized_credit Float    @default(0.7)
-  productive_credit    Float    @default(1.5)
-  unproductive_credit  Float    @default(0.2)
-  updated_at           DateTime @updatedAt
-}
-
 model report_types {
   id          Int      @id @default(autoincrement())
   name        String   @unique @db.VarChar(255)

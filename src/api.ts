@@ -19,7 +19,6 @@ import stateCategoriesRoutes from "./routes/state_categories.routes.js"
 import statesRoutes from "./routes/states.routes.js"
 import groupStateVisibilityRoutes from "./routes/group_state_visibility.routes.js"
 import lunchSkipsRoutes from "./routes/lunch_skips.routes.js"
-import productivitySettingsRoutes from "./routes/productivity_settings.routes.js"
 
 
 export function startApi() {
@@ -53,7 +52,6 @@ export function startApi() {
   app.use('/states', statesRoutes)
   app.use('/group-state-visibility', groupStateVisibilityRoutes)
   app.use('/lunch-skips', lunchSkipsRoutes)
-  app.use('/productivity-settings', productivitySettingsRoutes)
 
 
   app.get("/", pingData)
