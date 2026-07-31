@@ -1,5 +1,5 @@
 import { Router } from "express";
-import computerController, { listMachines, lockMachine, shutdownMachine, restartMachine, notifyMachine, syncMachine, sendFileToMachine, getReport, getScreenshot, getAll, setTakeScreenshots, syncToHelpdesk } from "../controllers/computer.controller.js"
+import computerController, { listMachines, lockMachine, shutdownMachine, restartMachine, notifyMachine, syncMachine, sendFileToMachine, getReport, getScreenshot, getAll, setTakeScreenshots, setNickname, syncToHelpdesk } from "../controllers/computer.controller.js"
 import { upload } from "../config/multer.js";
 import multer from "multer";
 
@@ -14,6 +14,7 @@ computerRoutes.post("/:serial/restart", restartMachine)
 computerRoutes.post("/:serial/notify", notifyMachine)
 computerRoutes.post("/:serial/sync", syncMachine)
 computerRoutes.patch("/:serial/take-screenshots", setTakeScreenshots)
+computerRoutes.patch("/:serial/nickname", setNickname)
 computerRoutes.get("/", getAll)
 computerRoutes.post("/sync-helpdesk", syncToHelpdesk)
 computerRoutes.delete("/delete/:serial", computerController.deleteBySerial)

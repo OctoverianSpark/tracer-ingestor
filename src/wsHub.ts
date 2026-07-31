@@ -307,6 +307,15 @@ class WsHub {
 
     const appuserMap = new Map(appusers.map(u => [String(u.id), u]));
 
+    // El apodo vive solo en la BD (no en el ClientConnection en memoria), se busca fresco en
+    // cada listAll() para reflejar ediciones inmediatamente sin tener que reconectar el agente.
+    const serials = clientList.map(c => c.machineSerial).filter((s): s is string => !!s);
+    const nicknameRows = await prisma.computers.findMany({
+      where: { serial_number: { in: serials } },
+      select: { serial_number: true, nickname: true }
+    });
+    const nicknameMap = new Map(nicknameRows.map(r => [r.serial_number, r.nickname]));
+
     return clientList.map(c => ({
       serial_number: c.machineSerial,
       hostname: c.machineName,
@@ -315,6 +324,7 @@ class WsHub {
       username: c.userName,
       machineBrand: c.machineBrand,
       machineModel: c.machineModel,
+      nickname: nicknameMap.get(c.machineSerial) ?? null,
       isAlive: this.isOnline(c.machineSerial),
       last_seen: c.connectedAt
     }));

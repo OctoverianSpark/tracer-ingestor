@@ -30,6 +30,13 @@ class ComputerService extends Service<computers, Prisma.computersCreateInput, Pr
     });
   }
 
+  async setNickname(serial: string, nickname: string | null) {
+    return await this.model.update({
+      where: { serial_number: serial },
+      data: { nickname }
+    });
+  }
+
 }
 
 

@@ -237,6 +237,26 @@ class ComputerController extends Controller<ComputerService> {
     res.json({ ok: failed.length === 0, take_screenshots: enabled, sent: results.length - failed.length, failed: failed.length, results });
   }
 
+  async setNickname(req: Request, res: Response) {
+    const { serial } = req.params as { serial: string };
+    const { nickname } = req.body as { nickname: string | null };
+    if (nickname !== null && typeof nickname !== "string") {
+      return res.status(400).json({ error: "nickname must be a string or null" });
+    }
+    const trimmed = typeof nickname === "string" ? nickname.trim() : null;
+    console.log(`[NICKNAME] target=${serial} nickname="${trimmed}"`);
+    try {
+      await this.service.setNickname(serial, trimmed || null);
+      return res.json({ ok: true, serial, nickname: trimmed || null });
+    } catch (error: any) {
+      if (error?.code === "P2025") {
+        return res.status(404).json({ error: "Computer not found" });
+      }
+      console.error(`[NICKNAME] Error serial=${serial}`, error);
+      return res.status(500).json({ error: "Failed to update nickname" });
+    }
+  }
+
   async listMachines(req: Request, res: Response) {
     try {
       const machines = await wsHub.listAll();
@@ -374,5 +394,5 @@ class ComputerController extends Controller<ComputerService> {
 }
 
 const computerController = new ComputerController();
-export const { lockMachine, shutdownMachine, restartMachine, notifyMachine, syncMachine, listMachines, getAll, getReport, getScreenshot, sendFileToMachine, setTakeScreenshots, syncToHelpdesk } = computerController;
+export const { lockMachine, shutdownMachine, restartMachine, notifyMachine, syncMachine, listMachines, getAll, getReport, getScreenshot, sendFileToMachine, setTakeScreenshots, setNickname, syncToHelpdesk } = computerController;
 export default computerController;
