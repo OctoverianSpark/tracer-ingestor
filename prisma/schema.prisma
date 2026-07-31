@@ -241,6 +241,7 @@ model productivity_settings {
   id                   Int      @id @default(1)
   uncategorized_credit Float    @default(0.7)
   productive_credit    Float    @default(1.5)
+  unproductive_credit  Float    @default(0.2)
   updated_at           DateTime @updatedAt
 }
 
