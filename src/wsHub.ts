@@ -307,14 +307,18 @@ class WsHub {
 
     const appuserMap = new Map(appusers.map(u => [String(u.id), u]));
 
-    // El apodo vive solo en la BD (no en el ClientConnection en memoria), se busca fresco en
-    // cada listAll() para reflejar ediciones inmediatamente sin tener que reconectar el agente.
+    // El apodo y take_screenshots viven solo en la BD (no en el ClientConnection en memoria), se
+    // buscan frescos en cada listAll() para reflejar ediciones inmediatamente sin tener que
+    // reconectar el agente. Antes take_screenshots faltaba acá por completo, así que el switch en
+    // MachineDialog (que trata `undefined` como `true`) siempre volvía a mostrarse encendido al
+    // recargar la página, sin importar el valor real guardado.
     const serials = clientList.map(c => c.machineSerial).filter((s): s is string => !!s);
-    const nicknameRows = await prisma.computers.findMany({
+    const computerRows = await prisma.computers.findMany({
       where: { serial_number: { in: serials } },
-      select: { serial_number: true, nickname: true }
+      select: { serial_number: true, nickname: true, take_screenshots: true }
     });
-    const nicknameMap = new Map(nicknameRows.map(r => [r.serial_number, r.nickname]));
+    const nicknameMap = new Map(computerRows.map(r => [r.serial_number, r.nickname]));
+    const takeScreenshotsMap = new Map(computerRows.map(r => [r.serial_number, r.take_screenshots]));
 
     return clientList.map(c => ({
       serial_number: c.machineSerial,
@@ -325,6 +329,7 @@ class WsHub {
       machineBrand: c.machineBrand,
       machineModel: c.machineModel,
       nickname: nicknameMap.get(c.machineSerial) ?? null,
+      take_screenshots: takeScreenshotsMap.get(c.machineSerial) ?? true,
       isAlive: this.isOnline(c.machineSerial),
       last_seen: c.connectedAt
     }));

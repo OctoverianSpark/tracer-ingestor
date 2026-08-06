@@ -9,6 +9,25 @@ class ScheduleController extends Controller<ScheduleService> {
     super([], ['limit', 'offset', 'appuser_id', 'programation_id'])
   }
 
+  // La base solo lee limit/offset de parseQuery y nunca pasa un `where` — appuser_id/programation_id
+  // quedaban declarados como queryParams pero se ignoraban por completo, devolviendo SIEMPRE la
+  // tabla entera. Un consumidor que pida "el horario de este usuario" recibe TODOS los horarios de
+  // TODOS los usuarios y termina quedándose con la primera fila que matchee por otro criterio
+  // (ej. día de la semana) — caso real: el agente de escritorio (ActiMetrics) tomaba el horario de
+  // OTRA persona al azar para decidir su fin de jornada/apagado automático.
+  async getAll(req: Request, res: Response) {
+    try {
+      const { limit, offset, appuser_id, programation_id } = this.parseQuery(req);
+      const where: Record<string, bigint> = {};
+      if (appuser_id !== undefined) where.appuser_id = BigInt(appuser_id);
+      if (programation_id !== undefined) where.programation_id = BigInt(programation_id);
+
+      const data = await this.service.getAll(limit, offset, Object.keys(where).length ? where : undefined);
+      res.status(200).json(data);
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  }
 
   async saveSchedules(req: Request, res: Response) {
     try {
