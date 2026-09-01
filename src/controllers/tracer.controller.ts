@@ -84,6 +84,21 @@ class TracerController extends Controller<ProgramationService> {
       const statesByCode = new Map(defaultStates.map(s => [s.code, s]));
       for (const s of groupStates) statesByCode.set(s.code, s);
 
+      // No se confía en el reloj del agente como fuente de verdad: se ancla el lote al reloj del
+      // SERVIDOR (siempre correcto vía NTP) en vez de aceptar Timestamp tal cual. Usar
+      // simplemente `new Date()` para cada fila destruiría la secuencia/duración relativa entre
+      // eventos del mismo lote (de la que depende todo el cálculo de malla horaria en
+      // buildActiveWindows), así que en vez de eso se calcula el DESFASE del reloj del agente
+      // (server_now - último_timestamp_del_lote) una sola vez y se aplica igual a todo el lote —
+      // corrige un reloj adelantado/atrasado (por error o manipulado a propósito) sin alterar en
+      // nada el orden ni la duración entre los eventos.
+      const clientTimestampsMs = payload
+        .map(log => new Date(log.Timestamp).getTime())
+        .filter(ms => !Number.isNaN(ms));
+      const clockSkewMs = clientTimestampsMs.length > 0
+        ? Date.now() - Math.max(...clientTimestampsMs)
+        : 0;
+
       // La categoría se deriva del estado (states.category_id), no del código "Category" del agente.
       const rows: Prisma.state_logsUncheckedCreateInput[] = [];
       for (const log of payload) {
@@ -100,7 +115,7 @@ class TracerController extends Controller<ProgramationService> {
           state_id: state.id,
           category_id: state.category_id,
           type,
-          timestamp: new Date(log.Timestamp)
+          timestamp: new Date(new Date(log.Timestamp).getTime() + clockSkewMs)
         });
       }
 
@@ -136,11 +151,21 @@ class TracerController extends Controller<ProgramationService> {
       });
       if (!computer) return res.status(404).json({ error: "Computer not found" });
 
+      // Mismo criterio que syncStates: se ancla el lote al reloj del SERVIDOR en vez del reloj
+      // del agente, corrigiendo el desfase completo (server_now - fin_de_intervalo_más_reciente
+      // del lote) sin tocar la duración de cada intervalo ni el orden entre ellos.
+      const clientEndsMs = payload
+        .map(log => new Date(log.IntervalEnd).getTime())
+        .filter(ms => !Number.isNaN(ms));
+      const clockSkewMs = clientEndsMs.length > 0
+        ? Date.now() - Math.max(...clientEndsMs)
+        : 0;
+
       await prisma.app_usage_logs.createMany({
         data: payload.map(log => ({
           computer_id:    computer.id,
-          interval_start: new Date(log.IntervalStart),
-          interval_end:   new Date(log.IntervalEnd),
+          interval_start: new Date(new Date(log.IntervalStart).getTime() + clockSkewMs),
+          interval_end:   new Date(new Date(log.IntervalEnd).getTime() + clockSkewMs),
           apps:           JSON.parse(log.Apps),
           active_seconds: log.ActiveSeconds ?? 0,
           idle_seconds:   log.IdleSeconds   ?? 0,

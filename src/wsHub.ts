@@ -3,6 +3,7 @@ import WebSocket from "ws";
 import type { ClientConnection, DashboardConnection, DashboardEvent, SyncDataMessage, UserInfoMessage, WsMessage } from "./types/tracer.js";
 import { MessageTypes } from "./types/tracer.js";
 import { resolveAgentPreferences } from "./types/agent-preferences.js";
+import { isPrivateIp, lookupTimezoneForIp } from "./services/geoTimezone.service.js";
 import prisma from "./lib/prisma.js";
 
 class WsHub {
@@ -69,6 +70,11 @@ class WsHub {
   private async _processConnection(client: ClientConnection, ws: WebSocket) {
     const existing = this.findClient(client.machineSerial);
 
+    const previous = await prisma.computers.findUnique({
+      where: { serial_number: client.machineSerial },
+      select: { ip_address: true, timezone_offset_minutes: true }
+    }).catch(() => null);
+
     try {
       await prisma.computers.upsert({
         where: { serial_number: client.machineSerial },
@@ -123,6 +129,12 @@ class WsHub {
       }
     }
 
+    // La IP cambió, o nunca se resolvió timezone para este equipo — se busca en segundo plano
+    // (no se espera acá) para no bloquear la conexión del agente por una llamada HTTP externa.
+    if (client.ip && (client.ip !== previous?.ip_address || previous?.timezone_offset_minutes == null)) {
+      this.refreshTimezoneForSerial(client.machineSerial, client.ip);
+    }
+
     // Si el mismo serial ya tiene una conexión activa más reciente, cerrar la anterior
     const current = this.clients.get(client.machineSerial);
     if (current?.ws && current.ws !== ws && current.ws.readyState === WebSocket.OPEN) {
@@ -142,6 +154,21 @@ class WsHub {
         appuser_id: String(client.appuser_id)
       }
     });
+  }
+
+  /** Busca la timezone del país de la IP y la guarda — fire-and-forget, ver _processConnection. */
+  private refreshTimezoneForSerial(serial: string, ip: string): void {
+    if (isPrivateIp(ip)) return;
+    lookupTimezoneForIp(ip)
+      .then(async info => {
+        if (!info) return;
+        await prisma.computers.update({
+          where: { serial_number: serial },
+          data: { timezone_name: info.name, timezone_offset_minutes: info.offsetMinutes }
+        });
+        console.log(`🌐 Timezone resuelta para ${serial}: ${info.name} (${info.offsetMinutes}min)`);
+      })
+      .catch(err => console.warn(`[wsHub] No se pudo resolver/guardar timezone para ${serial}:`, err));
   }
 
   /** Procesa el SyncDataMessage que el agente envía en respuesta a ActionMessageTypes.Sync. */
@@ -315,10 +342,11 @@ class WsHub {
     const serials = clientList.map(c => c.machineSerial).filter((s): s is string => !!s);
     const computerRows = await prisma.computers.findMany({
       where: { serial_number: { in: serials } },
-      select: { serial_number: true, nickname: true, take_screenshots: true }
+      select: { serial_number: true, nickname: true, take_screenshots: true, timezone_offset_minutes: true }
     });
     const nicknameMap = new Map(computerRows.map(r => [r.serial_number, r.nickname]));
     const takeScreenshotsMap = new Map(computerRows.map(r => [r.serial_number, r.take_screenshots]));
+    const timezoneOffsetMap = new Map(computerRows.map(r => [r.serial_number, r.timezone_offset_minutes]));
 
     return clientList.map(c => ({
       serial_number: c.machineSerial,
@@ -330,6 +358,7 @@ class WsHub {
       machineModel: c.machineModel,
       nickname: nicknameMap.get(c.machineSerial) ?? null,
       take_screenshots: takeScreenshotsMap.get(c.machineSerial) ?? true,
+      timezone_offset_minutes: timezoneOffsetMap.get(c.machineSerial) ?? null,
       isAlive: this.isOnline(c.machineSerial),
       last_seen: c.connectedAt
     }));
