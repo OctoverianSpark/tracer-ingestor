@@ -41,10 +41,26 @@ class TracerController extends Controller<ProgramationService> {
   protected service = programationService;
 
   async getStateLogs(req: Request, res: Response) {
-    const { computer_id } = req.query;
+    const { computer_id, from, to } = req.query;
     if (!computer_id) return res.status(400).json({ error: "Missing computer_id" });
+
+    // from/to opcionales por compatibilidad con llamadores viejos, pero sin ellos se trae el
+    // historial COMPLETO de la máquina — el causante del 504 en el reporte de Cumplimiento y
+    // Productividad, que antes pedía esto sin acotar por rango para cada usuario/máquina del
+    // filtro. Acotando aprovecha el índice compuesto [computer_id, timestamp] ya definido en el
+    // schema en vez de traer todo y filtrar en memoria en el dashboard.
+    const where: Prisma.state_logsWhereInput = { computer_id: BigInt(computer_id as string) };
+    if (from || to) {
+      const fromDate = from ? new Date(String(from)) : undefined;
+      const toDate = to ? new Date(String(to)) : undefined;
+      if ((fromDate && isNaN(fromDate.getTime())) || (toDate && isNaN(toDate.getTime()))) {
+        return res.status(400).json({ error: "Fechas inválidas. Usa formato ISO 8601: YYYY-MM-DDTHH:mm:ss" });
+      }
+      where.timestamp = { ...(fromDate && { gte: fromDate }), ...(toDate && { lte: toDate }) };
+    }
+
     const data = await prisma.state_logs.findMany({
-      where: { computer_id: BigInt(computer_id as string) },
+      where,
       include: { state: true, category: true }
     });
     return res.status(200).json({ ok: true, data });
