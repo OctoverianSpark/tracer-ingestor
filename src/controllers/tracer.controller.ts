@@ -59,11 +59,16 @@ class TracerController extends Controller<ProgramationService> {
       where.timestamp = { ...(fromDate && { gte: fromDate }), ...(toDate && { lte: toDate }) };
     }
 
-    const data = await prisma.state_logs.findMany({
-      where,
-      include: { state: true, category: true }
-    });
-    return res.status(200).json({ ok: true, data });
+    try {
+      const data = await prisma.state_logs.findMany({
+        where,
+        include: { state: true, category: true }
+      });
+      return res.status(200).json({ ok: true, data });
+    } catch (error: any) {
+      console.error("[tracer/get-state-logs] error:", error);
+      return res.status(500).json({ ok: false, error: error.message });
+    }
   }
 
   async syncStates(req: Request, res: Response) {

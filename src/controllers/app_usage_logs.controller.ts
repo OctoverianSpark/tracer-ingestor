@@ -45,6 +45,7 @@ class AppUsageLogsController extends Controller<AppUsageLogsService> {
       );
       return res.status(200).json(data);
     } catch (error: any) {
+      console.error("[app-usage-logs/by-date] error:", error);
       return res.status(500).json({ ok: false, error: error.message });
     }
   }
@@ -61,6 +62,7 @@ class AppUsageLogsController extends Controller<AppUsageLogsService> {
       const data = await this.service.getSummary(parsed.where);
       return res.status(200).json(data);
     } catch (error: any) {
+      console.error("[app-usage-logs/by-date/summary] error:", error);
       return res.status(500).json({ ok: false, error: error.message });
     }
   }
