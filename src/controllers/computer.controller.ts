@@ -13,6 +13,19 @@ import computerService, { type ComputerService } from "../services/computer.serv
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SCREENSHOTS_DIR = path.join(process.env.SCREENSHOTS_PATH || "../screenshots");
 
+// Reconstruye el instante real (UTC) a partir del prefijo del nombre de archivo que arma
+// saveScreenShot (config/multer.ts): `new Date().toISOString().replace(/[:.]/g, "-")`, ej.
+// "2026-09-17T23-45-01-123Z_Monitor1.jpg" ← ISO "2026-09-17T23:45:01.123Z". Devuelve la fecha
+// calendario de Bogotá de ese instante, o null si el nombre no matchea el formato esperado.
+function screenshotBogotaDate(filename: string): string | null {
+  const m = filename.match(/^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z/);
+  if (!m) return null;
+  const [, datePart, hh, mm, ss, ms] = m;
+  const instant = new Date(`${datePart}T${hh}:${mm}:${ss}.${ms}Z`);
+  if (isNaN(instant.getTime())) return null;
+  return instant.toLocaleDateString('sv', { timeZone: 'America/Bogota' });
+}
+
 class ComputerController extends Controller<ComputerService> {
   protected service = computerService;
 
@@ -281,7 +294,14 @@ class ComputerController extends Controller<ComputerService> {
     console.log(`[REPORT] computername=${computername} date=${date}`);
     try {
       const allFiles = readdirSync(path.join(SCREENSHOTS_DIR, computername));
-      const matched = allFiles.filter(file => file.includes(date));
+      // El nombre del archivo lleva el timestamp UTC de cuando el backend recibió la captura (ver
+      // saveScreenShot en config/multer.ts: `new Date().toISOString()`) — comparar por substring
+      // crudo contra la fecha LOCAL (Bogotá) pedida rompía cualquier captura tomada desde las
+      // 19:00 hora Colombia (UTC-5) en adelante: para entonces el timestamp UTC ya rodó al día
+      // calendario siguiente, así que su nombre de archivo nunca contenía la fecha local pedida.
+      // Se reconstruye el instante real desde el nombre y se compara por fecha calendario de
+      // Bogotá, no por texto crudo.
+      const matched = allFiles.filter(file => screenshotBogotaDate(file) === date);
       console.log(`[REPORT] ${matched.length} files matched`);
       res.json({ ok: true, files: matched });
     } catch (ex) {
