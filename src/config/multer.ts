@@ -65,6 +65,19 @@ export async function saveScreenShot(req: Request, res: Response) {
       .jpeg({ quality: 60 })
       .toFile(savePath);
 
+    // Miniatura para la galería del dashboard (ver getScreenshot ?thumb=1). Best-effort: si falla
+    // se genera on-demand la primera vez que se pida.
+    try {
+      const thumbDir = path.join(SCREENSHOTS_DIR, machine, "thumbs");
+      fs.mkdirSync(thumbDir, { recursive: true });
+      await sharp(file.buffer)
+        .resize({ width: 400, withoutEnlargement: true })
+        .jpeg({ quality: 60 })
+        .toFile(path.join(thumbDir, filename));
+    } catch (thumbErr) {
+      console.warn(`[SCREENSHOT] No se pudo generar miniatura de ${filename}`, (thumbErr as Error).message);
+    }
+
     console.log(`[SCREENSHOT SAVED] ${savePath}`);
     res.status(200).json({ message: "Screenshot saved", filename });
   } catch (ex) {

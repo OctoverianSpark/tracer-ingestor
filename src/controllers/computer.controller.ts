@@ -1,8 +1,9 @@
 import type { Request, Response } from "express";
 import { Prisma } from "@prisma/client";
 import { wsHub } from "../wsHub.js";
-import { readdirSync } from "fs";
+import { access, mkdir, readdir, rename } from "fs/promises";
 import path from "path";
+import sharp from "sharp";
 import { fileURLToPath } from "url";
 import { ActionMessageTypes, MessageTypes, type ActionMessage, type FileMessage, type NotificationMessage, type WsMessage } from "../types/tracer.js";
 import { createAction } from "../helpers/utils.js";
@@ -12,6 +13,24 @@ import computerService, { type ComputerService } from "../services/computer.serv
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SCREENSHOTS_DIR = path.join(process.env.SCREENSHOTS_PATH || "../screenshots");
+const SAFE_SEGMENT = /^[a-zA-Z0-9_\-][a-zA-Z0-9_\-\.]*$/; // no puede empezar con "." → descarta "." y ".."
+const THUMB_WIDTH = 400;
+
+// Miniatura en <machine>/thumbs/<filename>. Se genera la primera vez que se pide (así cubre
+// también las capturas viejas) y queda cacheada en disco. Escribe a un .tmp y renombra para que
+// dos requests simultáneos no dejen un JPEG a medio escribir.
+async function ensureThumbnail(dir: string, filename: string): Promise<string> {
+  const thumbPath = path.join(dir, "thumbs", filename);
+  try {
+    await access(thumbPath);
+    return thumbPath;
+  } catch { /* no existe todavía */ }
+  await mkdir(path.dirname(thumbPath), { recursive: true });
+  const tmp = `${thumbPath}.${process.pid}.${Date.now()}.tmp`;
+  await sharp(path.join(dir, filename)).resize({ width: THUMB_WIDTH, withoutEnlargement: true }).jpeg({ quality: 60 }).toFile(tmp);
+  await rename(tmp, thumbPath);
+  return thumbPath;
+}
 
 // Reconstruye el instante real (UTC) a partir del prefijo del nombre de archivo que arma
 // saveScreenShot (config/multer.ts): `new Date().toISOString().replace(/[:.]/g, "-")`, ej.
@@ -23,7 +42,21 @@ function screenshotBogotaDate(filename: string): string | null {
   const [, datePart, hh, mm, ss, ms] = m;
   const instant = new Date(`${datePart}T${hh}:${mm}:${ss}.${ms}Z`);
   if (isNaN(instant.getTime())) return null;
-  return instant.toLocaleDateString('sv', { timeZone: 'America/Bogota' });
+  return BOGOTA_DATE.format(instant);
+}
+
+// toLocaleDateString con timeZone arma un formateador nuevo en cada llamada (~70µs); con decenas
+// de miles de capturas por equipo eso eran varios segundos por /get-report. Se reutiliza uno solo.
+const BOGOTA_DATE = new Intl.DateTimeFormat('sv', { timeZone: 'America/Bogota' });
+
+// Una fecha calendario de Bogotá (UTC-5) solo puede venir de archivos cuyo prefijo UTC sea ese
+// mismo día o el siguiente. Filtrar por prefijo primero evita parsear el historial completo.
+function candidateUtcPrefixes(date: string): [string, string] | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const d = new Date(`${date}T00:00:00Z`);
+  if (isNaN(d.getTime())) return null;
+  const next = new Date(d.getTime() + 86_400_000).toISOString().slice(0, 10);
+  return [date, next];
 }
 
 class ComputerController extends Controller<ComputerService> {
@@ -293,7 +326,12 @@ class ComputerController extends Controller<ComputerService> {
     }
     console.log(`[REPORT] computername=${computername} date=${date}`);
     try {
-      const allFiles = readdirSync(path.join(SCREENSHOTS_DIR, computername));
+      const prefixes = candidateUtcPrefixes(date);
+      if (!prefixes) return res.status(400).json({ error: "Invalid date (expected YYYY-MM-DD)" });
+      // readdir asíncrono: el síncrono bloqueaba el event loop (y con él las miniaturas y el WS)
+      // mientras listaba carpetas con todo el historial del equipo.
+      const allFiles = (await readdir(path.join(SCREENSHOTS_DIR, computername)))
+        .filter(file => file.startsWith(prefixes[0]) || file.startsWith(prefixes[1]));
       // El nombre del archivo lleva el timestamp UTC de cuando el backend recibió la captura (ver
       // saveScreenShot en config/multer.ts: `new Date().toISOString()`) — comparar por substring
       // crudo contra la fecha LOCAL (Bogotá) pedida rompía cualquier captura tomada desde las
@@ -312,20 +350,23 @@ class ComputerController extends Controller<ComputerService> {
 
   async getScreenshot(req: Request, res: Response) {
     const { filename, machine } = req.params as { filename: string; machine: string };
-    if (!/^[a-zA-Z0-9_\-\.]+$/.test(machine) || !/^[a-zA-Z0-9_\-\.]+$/.test(filename)) {
+    if (!SAFE_SEGMENT.test(machine) || !SAFE_SEGMENT.test(filename)) {
       console.warn(`[SCREENSHOT] Invalid params machine="${machine}" file="${filename}"`);
       return res.status(400).json({ error: "Invalid path parameter" });
     }
-    console.log(`[SCREENSHOT] machine=${machine} file=${filename}`);
+    const thumb = req.query.thumb === "1";
+    // Antes se hacía readdirSync de toda la carpeta del equipo por cada imagen: O(n archivos),
+    // síncrono, bloqueaba el event loop con 24 miniaturas por página. Ahora acceso directo.
+    const dir = path.resolve(SCREENSHOTS_DIR, machine);
     try {
-      const files = readdirSync(path.join(SCREENSHOTS_DIR, machine));
-      if (!files.includes(filename)) {
-        console.warn(`[SCREENSHOT] Not found file=${filename}`);
-        res.status(404).json({ error: "Screenshot not found" });
-        return;
-      }
-      const filePath = path.join(SCREENSHOTS_DIR, machine, filename);
-      res.sendFile(filePath);
+      await access(path.join(dir, filename));
+    } catch {
+      console.warn(`[SCREENSHOT] Not found machine=${machine} file=${filename}`);
+      return res.status(404).json({ error: "Screenshot not found" });
+    }
+    try {
+      const filePath = thumb ? await ensureThumbnail(dir, filename) : path.join(dir, filename);
+      res.sendFile(filePath, { maxAge: "1d", immutable: true });
     } catch (err) {
       console.error(`[SCREENSHOT] Error machine=${machine}`, (err as Error).message);
       res.status(500).json({ error: "Error reading screenshots" });
