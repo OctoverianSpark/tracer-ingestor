@@ -16,7 +16,7 @@ const SCREENSHOTS_DIR = path.join(process.env.SCREENSHOTS_PATH || "../screenshot
 const SAFE_SEGMENT = /^[a-zA-Z0-9_\-][a-zA-Z0-9_\-\.]*$/; // no puede empezar con "." → descarta "." y ".."
 const THUMB_WIDTH = 400;
 
-// Miniatura en <machine>/thumbs/<filename>. Se genera la primera vez que se pide (así cubre
+// Miniatura en <owner>/thumbs/<filename>. Se genera la primera vez que se pide (así cubre
 // también las capturas viejas) y queda cacheada en disco. Escribe a un .tmp y renombra para que
 // dos requests simultáneos no dejen un JPEG a medio escribir.
 async function ensureThumbnail(dir: string, filename: string): Promise<string> {
@@ -314,23 +314,26 @@ class ComputerController extends Controller<ComputerService> {
     }
   }
 
+  // Capturas de un día. Se piden por `appuser_id` (carpeta del usuario, ver saveScreenShot en
+  // config/multer.ts); `computername` queda por compatibilidad con la carpeta vieja por hostname.
   async getReport(req: Request, res: Response) {
-    const { computername, date } = req.query as { computername: string; date: string };
-    if (!computername || !date) {
-      res.status(400).json({ error: "Missing computername or date query parameters" });
+    const { appuser_id, computername, date } = req.query as { appuser_id?: string; computername?: string; date?: string };
+    const folder = appuser_id ?? computername;
+    if (!folder || !date) {
+      res.status(400).json({ error: "Missing appuser_id or date query parameters" });
       return;
     }
-    if (!/^[a-zA-Z0-9_\-\.]+$/.test(computername)) {
-      console.warn(`[REPORT] Invalid computername="${computername}"`);
-      return res.status(400).json({ error: "Invalid computername" });
+    if (appuser_id ? !/^\d+$/.test(appuser_id) : !SAFE_SEGMENT.test(folder)) {
+      console.warn(`[REPORT] Invalid folder="${folder}"`);
+      return res.status(400).json({ error: "Invalid appuser_id" });
     }
-    console.log(`[REPORT] computername=${computername} date=${date}`);
+    console.log(`[REPORT] folder=${folder} date=${date}`);
     try {
       const prefixes = candidateUtcPrefixes(date);
       if (!prefixes) return res.status(400).json({ error: "Invalid date (expected YYYY-MM-DD)" });
       // readdir asíncrono: el síncrono bloqueaba el event loop (y con él las miniaturas y el WS)
       // mientras listaba carpetas con todo el historial del equipo.
-      const allFiles = (await readdir(path.join(SCREENSHOTS_DIR, computername)))
+      const allFiles = (await readdir(path.join(SCREENSHOTS_DIR, folder)))
         .filter(file => file.startsWith(prefixes[0]) || file.startsWith(prefixes[1]));
       // El nombre del archivo lleva el timestamp UTC de cuando el backend recibió la captura (ver
       // saveScreenShot en config/multer.ts: `new Date().toISOString()`) — comparar por substring
@@ -343,32 +346,34 @@ class ComputerController extends Controller<ComputerService> {
       console.log(`[REPORT] ${matched.length} files matched`);
       res.json({ ok: true, files: matched });
     } catch (ex) {
-      console.error(`[REPORT] Error computername=${computername}`, (ex as Error).message);
+      // Usuario sin capturas todavía: no hay carpeta → lista vacía, no error.
+      if ((ex as NodeJS.ErrnoException).code === "ENOENT") return res.json({ ok: true, files: [] });
+      console.error(`[REPORT] Error folder=${folder}`, (ex as Error).message);
       res.status(500).json({ error: "Failed to read screenshots directory" });
     }
   }
 
   async getScreenshot(req: Request, res: Response) {
-    const { filename, machine } = req.params as { filename: string; machine: string };
-    if (!SAFE_SEGMENT.test(machine) || !SAFE_SEGMENT.test(filename)) {
-      console.warn(`[SCREENSHOT] Invalid params machine="${machine}" file="${filename}"`);
+    const { filename, owner } = req.params as { filename: string; owner: string };
+    if (!SAFE_SEGMENT.test(owner) || !SAFE_SEGMENT.test(filename)) {
+      console.warn(`[SCREENSHOT] Invalid params owner="${owner}" file="${filename}"`);
       return res.status(400).json({ error: "Invalid path parameter" });
     }
     const thumb = req.query.thumb === "1";
     // Antes se hacía readdirSync de toda la carpeta del equipo por cada imagen: O(n archivos),
     // síncrono, bloqueaba el event loop con 24 miniaturas por página. Ahora acceso directo.
-    const dir = path.resolve(SCREENSHOTS_DIR, machine);
+    const dir = path.resolve(SCREENSHOTS_DIR, owner);
     try {
       await access(path.join(dir, filename));
     } catch {
-      console.warn(`[SCREENSHOT] Not found machine=${machine} file=${filename}`);
+      console.warn(`[SCREENSHOT] Not found owner=${owner} file=${filename}`);
       return res.status(404).json({ error: "Screenshot not found" });
     }
     try {
       const filePath = thumb ? await ensureThumbnail(dir, filename) : path.join(dir, filename);
       res.sendFile(filePath, { maxAge: "1d", immutable: true });
     } catch (err) {
-      console.error(`[SCREENSHOT] Error machine=${machine}`, (err as Error).message);
+      console.error(`[SCREENSHOT] Error owner=${owner}`, (err as Error).message);
       res.status(500).json({ error: "Error reading screenshots" });
     }
   }

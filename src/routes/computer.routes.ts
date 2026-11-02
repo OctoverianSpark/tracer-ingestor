@@ -31,6 +31,6 @@ computerRoutes.post('/:serial/send-file', (req, res, next) => {
     next()
   })
 }, sendFileToMachine)
-computerRoutes.get("/screenshot/:machine/:filename", getScreenshot)
+computerRoutes.get("/screenshot/:owner/:filename", getScreenshot)
 
 export default computerRoutes
