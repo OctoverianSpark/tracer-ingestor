@@ -202,6 +202,15 @@ class TracerController extends Controller<ProgramationService> {
     }
   }
 
+  // Lo usa el inicio de sesión del agente para no aceptar un correo que no existe: con un correo
+  // no registrado el WebSocket se rechaza (ver ws.ts) y el equipo queda sin usuario.
+  async validateEmail(req: Request, res: Response) {
+    const email = (req.query.email as string | undefined)?.trim();
+    if (!email) return res.status(400).json({ error: "Missing email" });
+    const appuser = await prisma.appuser.findFirst({ where: { email }, select: { full_name: true } });
+    res.json({ ok: true, exists: !!appuser, full_name: appuser?.full_name ?? null });
+  }
+
   async getPermissions(req: Request, res: Response) {
     const { serial } = req.query as { serial: string };
     if (!serial) return res.status(400).json({ error: "Missing serial" });
@@ -415,5 +424,5 @@ class TracerController extends Controller<ProgramationService> {
 }
 
 const tracerController = new TracerController();
-export const { getStateLogs, syncStates, syncAppUsage, pingData, ProgramationSave, GetProgramations, GetSchedules, SchedulePersonal, getUpdateInfo, downloadUpdate, uploadUpdate, getReleaseManifest, downloadPackage, getPermissions } = tracerController;
+export const { getStateLogs, syncStates, syncAppUsage, pingData, ProgramationSave, GetProgramations, GetSchedules, SchedulePersonal, getUpdateInfo, downloadUpdate, uploadUpdate, getReleaseManifest, downloadPackage, getPermissions, validateEmail } = tracerController;
 export default tracerController;

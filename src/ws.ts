@@ -8,6 +8,9 @@ import prisma from "./lib/prisma.js";
 
 const wss = new WebSocketServer({ host: '0.0.0.0', port: 8080 });
 
+// Código de cierre (rango 4000-4999 = de la aplicación) para agentes cuyo correo no existe en appuser.
+const EMAIL_NOT_REGISTERED = 4001;
+
 export const startWs = () => {
 
   wsHub.initialize();
@@ -51,11 +54,16 @@ export const startWs = () => {
       const payload = decoded as ClientConnection & { email: string }
 
       const appuser = await prisma.appuser.findFirst({
-        where: { email: payload.email }
+        where: { email: payload.email?.trim() }
       })
 
       if (!appuser) {
-        ws.close();
+        // Antes se cerraba sin código ni log: el equipo quedaba sin usuario asignado, nunca
+        // aparecía conectado y sus capturas no se veían en el dashboard, sin pista de por qué.
+        // El agente (1.10.23+) reconoce el código 4001, borra el correo guardado y vuelve a
+        // pedir el inicio de sesión.
+        console.warn(`[WS] Correo no registrado: "${payload.email}" desde ${payload.machineName} (${payload.machineSerial}, usuario Windows ${payload.userName})`);
+        ws.close(EMAIL_NOT_REGISTERED, "email_not_registered");
         return;
       }
 

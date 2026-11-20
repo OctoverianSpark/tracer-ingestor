@@ -11,6 +11,8 @@ services:
       SCREENSHOTS_PATH: ${SCREENSHOTS_PATH}
     volumes:
       - screenshots:/app/screenshots
+      - agent_logs:/app/agent-logs
 
 volumes:
   screenshots:
+  agent_logs:

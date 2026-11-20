@@ -93,6 +93,8 @@ Sube un nuevo instalador. Reemplaza el anterior si tiene el mismo nombre.
 | `CORS_ORIGIN` | Orígenes permitidos (coma-separados) | deshabilitado |
 | `SCREENSHOTS_PATH` | Ruta absoluta para guardar screenshots | `src/screenshots/` |
 | `INSTALLERS_PATH` | Ruta absoluta para la carpeta de instaladores | `src/installers/` |
+| `AGENT_LOGS_PATH` | Carpeta de los logs que sube el agente (`POST/GET /tracer/logs`) | `src/agent-logs/` |
+| `AGENT_LOGS_RETENTION_DAYS` | Días que se conservan esos logs | `14` |
 | `DATABASE_URL` | Connection string MySQL para Prisma | — |
 
 ## Convenciones
